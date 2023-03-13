@@ -190,7 +190,7 @@ public class NacosNamingService implements NamingService {
         registerInstance(serviceName, Constants.DEFAULT_GROUP, instance);
     }
     
-    @Override
+    @Override //处理client注册
     public void registerInstance(String serviceName, String groupName, Instance instance) throws NacosException {
         String groupedServiceName = NamingUtils.getGroupedName(serviceName, groupName);
         if (instance.isEphemeral()) {
