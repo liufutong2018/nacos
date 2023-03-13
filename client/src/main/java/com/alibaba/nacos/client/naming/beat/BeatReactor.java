@@ -72,7 +72,7 @@ public class BeatReactor implements Closeable {
     }
     
     /**
-     * Add beat information.
+     * Add beat information. 发送心跳
      *
      * @param serviceName service name
      * @param beatInfo    beat information
@@ -169,7 +169,7 @@ public class BeatReactor implements Closeable {
             try {
                 // 发送心跳，nacos自定义的
                 JsonNode result = serverProxy.sendBeat(beatInfo, BeatReactor.this.lightBeatEnabled);
-                long interval = result.get("clientBeatInterval").asLong();
+                long interval = result.get("clientBeatInterval").asLong(); //间隔
                 boolean lightBeatEnabled = false;
                 if (result.has(CommonParams.LIGHT_BEAT_ENABLED)) {
                     lightBeatEnabled = result.get(CommonParams.LIGHT_BEAT_ENABLED).asBoolean();
@@ -180,8 +180,9 @@ public class BeatReactor implements Closeable {
                 }
                 int code = NamingResponseCode.OK;
                 if (result.has(CommonParams.CODE)) {
-                    code = result.get(CommonParams.CODE).asInt();
+                    code = result.get(CommonParams.CODE).asInt(); //从结果获取状态
                 }
+                // 若在server端没有该client，则返回20404；此时发起注册
                 if (code == NamingResponseCode.RESOURCE_NOT_FOUND) {
                     Instance instance = new Instance();
                     instance.setPort(beatInfo.getPort());
@@ -193,6 +194,7 @@ public class BeatReactor implements Closeable {
                     instance.setInstanceId(instance.getInstanceId());
                     instance.setEphemeral(true);
                     try {
+                        //发出注册请求
                         serverProxy.registerService(beatInfo.getServiceName(),
                                 NamingUtils.getGroupName(beatInfo.getServiceName()), instance);
                     } catch (Exception ignore) {
@@ -203,6 +205,7 @@ public class BeatReactor implements Closeable {
                         JacksonUtils.toJson(beatInfo), ex.getErrCode(), ex.getErrMsg());
                 
             }
+            // 又启动一次定时任务
             executorService.schedule(new BeatTask(beatInfo), nextTime, TimeUnit.MILLISECONDS);
         }
     }

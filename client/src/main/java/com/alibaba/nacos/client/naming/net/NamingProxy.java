@@ -402,7 +402,7 @@ public class NamingProxy implements Closeable {
     }
     
     /**
-     * Send beat.
+     * Send beat. 发送心跳
      *
      * @param beatInfo         beat info
      * @param lightBeatEnabled light beat
@@ -424,6 +424,7 @@ public class NamingProxy implements Closeable {
         params.put(CommonParams.CLUSTER_NAME, beatInfo.getCluster());
         params.put("ip", beatInfo.getIp());
         params.put("port", String.valueOf(beatInfo.getPort()));
+        // 发出put请求
         String result = reqApi(UtilAndComs.nacosUrlBase + "/instance/beat", params, bodyMap, HttpMethod.PUT);
         return JacksonUtils.toObj(result);
     }
