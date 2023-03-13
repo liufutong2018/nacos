@@ -443,7 +443,7 @@ public class NacosNamingService implements NamingService {
         subscribe(serviceName, Constants.DEFAULT_GROUP, clusters, listener);
     }
     
-    @Override
+    @Override //client定时更新本地服务
     public void subscribe(String serviceName, String groupName, List<String> clusters, EventListener listener)
             throws NacosException {
         eventDispatcher.addListener(hostReactor
