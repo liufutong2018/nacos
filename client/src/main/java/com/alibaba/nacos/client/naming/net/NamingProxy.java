@@ -451,6 +451,7 @@ public class NamingProxy implements Closeable {
         return getServiceList(pageNo, pageSize, groupName, null);
     }
     
+    // client获取所有服务
     public ListView<String> getServiceList(int pageNo, int pageSize, String groupName, AbstractSelector selector)
             throws NacosException {
         
@@ -472,14 +473,14 @@ public class NamingProxy implements Closeable {
                     break;
             }
         }
-        
+        // 向server提交get请求，获取结果
         String result = reqApi(UtilAndComs.nacosUrlBase + "/service/list", params, HttpMethod.GET);
         
         JsonNode json = JacksonUtils.toObj(result);
         ListView<String> listView = new ListView<String>();
-        listView.setCount(json.get("count").asInt());
+        listView.setCount(json.get("count").asInt());//查出的数量
         listView.setData(JacksonUtils.toObj(json.get("doms").toString(), new TypeReference<List<String>>() {
-        }));
+        }));//查出的名称
         
         return listView;
     }
