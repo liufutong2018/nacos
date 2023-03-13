@@ -192,11 +192,15 @@ public class NacosNamingService implements NamingService {
     
     @Override //处理client注册
     public void registerInstance(String serviceName, String groupName, Instance instance) throws NacosException {
+        // 获得groupedServiceName 生成的String格式为 groupId@@微服务名称
         String groupedServiceName = NamingUtils.getGroupedName(serviceName, groupName);
-        if (instance.isEphemeral()) {
+        if (instance.isEphemeral()) { //若当前实例是临时实例，则向server发送心跳
+            // 构建一个心跳信息实例
             BeatInfo beatInfo = beatReactor.buildBeatInfo(groupedServiceName, instance);
+            // 2.向server发送心跳（定时任务），开了另一个线程去执行
             beatReactor.addBeatInfo(groupedServiceName, beatInfo);
         }
+        // 1.向server发送注册请求
         serverProxy.registerService(groupedServiceName, groupName, instance);
     }
     

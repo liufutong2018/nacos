@@ -72,13 +72,13 @@ public class JdkHttpClientRequest implements HttpClientRequest {
         }
     }
     
-    @Override
+    @Override //nacos自己定义的
     public HttpClientResponse execute(URI uri, String httpMethod, RequestHttpEntity requestHttpEntity)
             throws Exception {
         final Object body = requestHttpEntity.getBody();
         final Header headers = requestHttpEntity.getHeaders();
         replaceDefaultConfig(requestHttpEntity.getHttpClientConfig());
-        
+        // 创建一个HttpURLConnection
         HttpURLConnection conn = (HttpURLConnection) uri.toURL().openConnection();
         Map<String, String> headerMap = headers.getHeader();
         if (headerMap != null && headerMap.size() > 0) {
@@ -106,8 +106,8 @@ public class JdkHttpClientRequest implements HttpClientRequest {
                 conn.getOutputStream().close();
             }
         }
-        conn.connect();
-        return new JdkHttpClientResponse(conn);
+        conn.connect(); // 发出连接请求
+        return new JdkHttpClientResponse(conn);// 响应
     }
     
     /**

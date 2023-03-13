@@ -424,6 +424,7 @@ public class NacosRestTemplate extends AbstractNacosRestTemplate {
             String httpMethod, Type responseType) throws Exception {
         RequestHttpEntity requestHttpEntity = new RequestHttpEntity(
                 header.setContentType(MediaType.APPLICATION_FORM_URLENCODED), query, bodyValues);
+        // 提交请求
         return execute(url, httpMethod, requestHttpEntity, responseType);
     }
     
@@ -479,6 +480,7 @@ public class NacosRestTemplate extends AbstractNacosRestTemplate {
         ResponseHandler<T> responseHandler = super.selectResponseHandler(responseType);
         HttpClientResponse response = null;
         try {
+            //获取到nacos自定义的HttpClient，其就是对JDK中的HttpURLConnection的封装
             response = this.requestClient().execute(uri, httpMethod, requestEntity);
             return responseHandler.handle(response);
         } finally {

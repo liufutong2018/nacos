@@ -79,13 +79,16 @@ public class BeatReactor implements Closeable {
      */
     public void addBeatInfo(String serviceName, BeatInfo beatInfo) {
         NAMING_LOGGER.info("[BEAT] adding beat: {} to beat map.", beatInfo);
+        // 形成key的形式 groupId@@微服务名称#ip#port ； 这个key固定主机了
         String key = buildKey(serviceName, beatInfo.getIp(), beatInfo.getPort());
         BeatInfo existBeat = null;
         //fix #1733
+        // dom2Beat是一个缓存map，key为主机，value则为该主机发送的心跳beatInfo
         if ((existBeat = dom2Beat.remove(key)) != null) {
-            existBeat.setStopped(true);
+            existBeat.setStopped(true); //把之前的心跳停了
         }
         dom2Beat.put(key, beatInfo);
+        //开启一个定时任务
         executorService.schedule(new BeatTask(beatInfo), beatInfo.getPeriod(), TimeUnit.MILLISECONDS);
         MetricsMonitor.getDom2BeatSizeMonitor().set(dom2Beat.size());
     }
@@ -157,13 +160,14 @@ public class BeatReactor implements Closeable {
             this.beatInfo = beatInfo;
         }
         
-        @Override
+        @Override //执行run()方法
         public void run() {
             if (beatInfo.isStopped()) {
                 return;
             }
             long nextTime = beatInfo.getPeriod();
             try {
+                // 发送心跳，nacos自定义的
                 JsonNode result = serverProxy.sendBeat(beatInfo, BeatReactor.this.lightBeatEnabled);
                 long interval = result.get("clientBeatInterval").asLong();
                 boolean lightBeatEnabled = false;

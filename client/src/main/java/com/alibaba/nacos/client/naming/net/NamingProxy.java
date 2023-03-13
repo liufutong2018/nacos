@@ -212,7 +212,7 @@ public class NamingProxy implements Closeable {
     
     /**
      * register a instance to service with specified instance properties.
-     *
+     * 向server发送注册请求
      * @param serviceName name of service
      * @param groupName   group of service
      * @param instance    instance to register
@@ -223,6 +223,7 @@ public class NamingProxy implements Closeable {
         NAMING_LOGGER.info("[REGISTER-SERVICE] {} registering service {} with instance: {}", namespaceId, serviceName,
                 instance);
         
+        //将instance拆散后写到params中，并以请求参数的形式出现在请求中
         final Map<String, String> params = new HashMap<String, String>(16);
         params.put(CommonParams.NAMESPACE_ID, namespaceId);
         params.put(CommonParams.SERVICE_NAME, serviceName);
@@ -235,7 +236,7 @@ public class NamingProxy implements Closeable {
         params.put("healthy", String.valueOf(instance.isHealthy()));
         params.put("ephemeral", String.valueOf(instance.isEphemeral()));
         params.put("metadata", JacksonUtils.toJson(instance.getMetadata()));
-        
+        // 提交一个post请求
         reqApi(UtilAndComs.nacosUrlInstance, params, HttpMethod.POST);
         
     }
@@ -488,7 +489,7 @@ public class NamingProxy implements Closeable {
     
     public String reqApi(String api, Map<String, String> params, Map<String, String> body, String method)
             throws NacosException {
-        return reqApi(api, params, body, getServerList(), method);
+        return reqApi(api, params, body, getServerList(), method); //getServerList()：获取到客户端配置nacosServer地址
     }
     
     /**
@@ -513,14 +514,16 @@ public class NamingProxy implements Closeable {
         
         NacosException exception = new NacosException();
         
+        // 遍历所有server，从中随机的选择一个server去连接 
         if (servers != null && !servers.isEmpty()) {
-            
+            // 生成一个随机数
             Random random = new Random(System.currentTimeMillis());
             int index = random.nextInt(servers.size());
             
-            for (int i = 0; i < servers.size(); i++) {
+            for (int i = 0; i < servers.size(); i++) { //不成功轮训数量为服务器数量
                 String server = servers.get(index);
                 try {
+                    // 连接server； 如果连接成功，直接返回
                     return callServer(api, params, body, server, method);
                 } catch (NacosException e) {
                     exception = e;
@@ -528,12 +531,13 @@ public class NamingProxy implements Closeable {
                         NAMING_LOGGER.debug("request {} failed.", server, e);
                     }
                 }
+                // 若该server连接失败，则轮训下一个服务器，直到成功
                 index = (index + 1) % servers.size();
             }
         }
         
         if (StringUtils.isNotBlank(nacosDomain)) {
-            for (int i = 0; i < UtilAndComs.REQUEST_DOMAIN_RETRY_COUNT; i++) {
+            for (int i = 0; i < UtilAndComs.REQUEST_DOMAIN_RETRY_COUNT; i++) { //默认3次
                 try {
                     return callServer(api, params, body, nacosDomain, method);
                 } catch (NacosException e) {
@@ -567,7 +571,7 @@ public class NamingProxy implements Closeable {
     }
     
     /**
-     * Call server.
+     * Call server. 连接server；
      *
      * @param api       api
      * @param params    parameters
@@ -584,7 +588,7 @@ public class NamingProxy implements Closeable {
         injectSecurityInfo(params);
         Header header = builderHeader();
         
-        String url;
+        String url; // 构建请求URL
         if (curServer.startsWith(UtilAndComs.HTTPS) || curServer.startsWith(UtilAndComs.HTTP)) {
             url = curServer + api;
         } else {
@@ -594,7 +598,7 @@ public class NamingProxy implements Closeable {
             url = NamingHttpClientManager.getInstance().getPrefix() + curServer + api;
         }
         
-        try {
+        try { //提交请求
             HttpRestResult<String> restResult = nacosRestTemplate
                     .exchangeForm(url, header, Query.newInstance().initParams(params), body, method, String.class);
             end = System.currentTimeMillis();
