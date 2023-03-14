@@ -114,15 +114,16 @@ public class ClientBeatCheckTask implements Runnable {
             
             // then remove obsolete instances:
             for (Instance instance : instances) {
-                
+                // 若当前instance被标记了，说明其为过期的持久实例，直接跳过
                 if (instance.isMarked()) {
                     continue;
                 }
-                
+                // 若当前时间与上次心跳时间间隔超过了30s，则将当前instance清除
                 if (System.currentTimeMillis() - instance.getLastBeat() > instance.getIpDeleteTimeout()) {
                     // delete instance
                     Loggers.SRV_LOG.info("[AUTO-DELETE-IP] service: {}, ip: {}", service.getName(),
                             JacksonUtils.toJson(instance));
+                    // 清除
                     deleteIp(instance);
                 }
             }
@@ -136,15 +137,18 @@ public class ClientBeatCheckTask implements Runnable {
     private void deleteIp(Instance instance) {
         
         try {
+            // 构建并初始化一个request
             NamingProxy.Request request = NamingProxy.Request.newRequest();
             request.appendParam("ip", instance.getIp()).appendParam("port", String.valueOf(instance.getPort()))
                     .appendParam("ephemeral", "true").appendParam("clusterName", instance.getClusterName())
                     .appendParam("serviceName", service.getName()).appendParam("namespaceId", service.getNamespaceId());
             
+            // 构建一个访问自己的请求url
             String url = "http://127.0.0.1:" + ApplicationUtils.getPort() + ApplicationUtils.getContextPath()
                     + UtilsAndCommons.NACOS_NAMING_CONTEXT + "/instance?" + request.toUrl();
             
             // delete instance asynchronously:
+            // 异步删除；调用 Nacos 自研的HttpcLient完成Server间的请求提交，该HttpcLient是对Apache的Http异步CLient的封装
             HttpClient.asyncHttpDelete(url, null, null, new Callback<String>() {
                 @Override
                 public void onReceive(RestResult<String> result) {

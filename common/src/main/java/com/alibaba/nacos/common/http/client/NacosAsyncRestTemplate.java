@@ -361,6 +361,7 @@ public class NacosAsyncRestTemplate extends AbstractNacosRestTemplate {
                 logger.debug("HTTP method: {}, url: {}, body: {}", httpMethod, uri, requestEntity.getBody());
             }
             ResponseHandler<T> responseHandler = super.selectResponseHandler(type);
+            // 执行
             clientRequest.execute(uri, httpMethod, requestEntity, responseHandler, callback);
         } catch (Exception e) {
             // When an exception occurs, use Callback to pass it instead of throw it directly.

@@ -154,6 +154,7 @@ public class HttpClient {
      */
     public static void asyncHttpDelete(String url, List<String> headers, Map<String, String> paramValues,
             Callback<String> callback) throws Exception {
+        // 提交一个delete
         asyncHttpRequest(url, headers, paramValues, callback, HttpMethod.DELETE);
     }
     
@@ -178,7 +179,7 @@ public class HttpClient {
             header.addAll(headers);
         }
         header.addParam(HttpHeaderConsts.ACCEPT_CHARSET, "UTF-8");
-        
+        // 针对不同请求的不同处理方式
         switch (method) {
             case HttpMethod.GET:
                 ASYNC_REST_TEMPLATE.get(url, header, query, String.class, callback);

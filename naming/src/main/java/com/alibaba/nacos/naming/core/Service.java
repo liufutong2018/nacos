@@ -302,7 +302,7 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
             entry.getValue().setService(this);
             // 开启当前遍历cLuster的健康检测任务：
             //  将当前cluster包含的所有instance的心跳检测任务定时添加到一个任务队列taskQueue
-            // 即将当前cLuster所包含的持久实例的心跳任务添加到taskQueue
+            // 即将当前cLuster所包含的 持久实例 的心跳任务添加到taskQueue
             entry.getValue().init();
         }
     }
