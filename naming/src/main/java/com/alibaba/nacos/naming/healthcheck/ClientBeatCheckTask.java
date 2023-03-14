@@ -71,30 +71,36 @@ public class ClientBeatCheckTask implements Runnable {
         return KeyBuilder.buildServiceMetaKey(service.getNamespaceId(), service.getName());
     }
     
-    @Override
+    @Override // 用于清除过期instance任务
     public void run() {
         try {
+            // 若当前service不用当前Server负责，则直接结束
             if (!getDistroMapper().responsible(service.getName())) {
                 return;
             }
-            
+            // 苦当前服务没有开启检测功能，则直接结束
             if (!getSwitchDomain().isHealthCheckEnabled()) {
                 return;
             }
-            
+            // 获取当前服务的所有临时实例
             List<Instance> instances = service.allIPs(true);
             
-            // first set health status of instances:
+            // first set health status of instances: 遍历当前服务的所有临时实例
             for (Instance instance : instances) {
+                // 若当前时间距离上次心跳时间已经超过了15s，则将当前instance状态设置为不健康
                 if (System.currentTimeMillis() - instance.getLastBeat() > instance.getInstanceHeartBeatTimeOut()) {
+                    // 若instance的marked属性不为true，则当前instance 可能是临时实例marked属性
+                    // 若为true，则instance 一定为持久实例
                     if (!instance.isMarked()) {
                         if (instance.isHealthy()) {
+                            // 将healthy状态设置为false
                             instance.setHealthy(false);
                             Loggers.EVT_LOG
                                     .info("{POS} {IP-DISABLED} valid: {}:{}@{}@{}, region: {}, msg: client timeout after {}, last beat: {}",
                                             instance.getIp(), instance.getPort(), instance.getClusterName(),
                                             service.getName(), UtilsAndCommons.LOCALHOST_SITE,
                                             instance.getInstanceHeartBeatTimeOut(), instance.getLastBeat());
+                            // 发布状态变更事件
                             getPushService().serviceChanged(service);
                             ApplicationUtils.publishEvent(new InstanceHeartbeatTimeoutEvent(this, instance));
                         }

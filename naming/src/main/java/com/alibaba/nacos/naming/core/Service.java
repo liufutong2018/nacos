@@ -292,12 +292,15 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
     }
     
     /**
-     * Init service.
+     * Init service.  初始化service内部健康检测任务
      */
     public void init() {
+        // 开启定时清除过期instance任务
         HealthCheckReactor.scheduleCheck(clientBeatCheckTask);
+        // 开启了当前service所包含的所有cLuster的健康检测任务
         for (Map.Entry<String, Cluster> entry : clusterMap.entrySet()) {
             entry.getValue().setService(this);
+            // 开启当前遍历cLuster的健康检测任务
             entry.getValue().init();
         }
     }

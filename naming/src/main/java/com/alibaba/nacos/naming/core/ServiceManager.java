@@ -746,7 +746,7 @@ public class ServiceManager implements RecordListener<Service> {
     private void putServiceAndInit(Service service) throws NacosException {
         // 将service写入注册表
         putService(service);
-        // 初始化service内部健康检测任务
+        // 初始化service内部健康检测任务❤
         service.init();
         // 给nacos集合中的当前服务的持实例、临时实例添加监听
         consistencyService
