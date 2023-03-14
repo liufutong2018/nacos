@@ -115,6 +115,7 @@ public class HostReactor implements Closeable {
     }
     
     public synchronized ScheduledFuture<?> addTask(UpdateTask task) {
+        // 开启一个一次性定时器
         return executor.schedule(task, DEFAULT_DELAY, TimeUnit.MILLISECONDS);
     }
     
@@ -353,7 +354,7 @@ public class HostReactor implements Closeable {
                 return;
             }
             
-            // 创建一个定时异步操作对象
+            // 创建一个定时异步操作对象，并启动这个任务
             ScheduledFuture<?> future = addTask(new UpdateTask(serviceName, clusters));
             // 将这个定时异步操作对象写入到缓存map
             futureMap.put(ServiceInfo.getKey(serviceName, clusters), future);
@@ -440,18 +441,26 @@ public class HostReactor implements Closeable {
             failCount = 0;
         }
         
-        @Override
+        @Override //执行run()方法
         public void run() {
             long delayTime = DEFAULT_DELAY;
             
             try {
+                // 从本地注册表中获取当前服务
                 ServiceInfo serviceObj = serviceInfoMap.get(ServiceInfo.getKey(serviceName, clusters));
                 
+                // 若本地地注册表中不存在该服务，则从server获取到后，更新到本地注册表
                 if (serviceObj == null) {
+                    // 从server获取当前服务，并更新到本地注册表
                     updateService(serviceName, clusters);
                     return;
                 }
-                
+                /** 处理本地注册表中存在当前服务的情况
+                    1.serviceObj.getLastRefTime() 获取到的是当前服务最后被访问的时间，这个时间是来自于本地注册表的，
+                      其记录的是所有提供这个服务的nstance中最后一个instance被访问的时间
+                    2.缓存LastRefTime 记录的是当前instance最后被访问的时间
+                    若1。时间 小于 2。时间，说明当前注册表应该更新的
+                */
                 if (serviceObj.getLastRefTime() <= lastRefTime) {
                     updateService(serviceName, clusters);
                     serviceObj = serviceInfoMap.get(ServiceInfo.getKey(serviceName, clusters));
@@ -461,6 +470,7 @@ public class HostReactor implements Closeable {
                     refreshOnly(serviceName, clusters);
                 }
                 
+                // 将来自于注册表的这个最后访问时间更新到当前client的缓存
                 lastRefTime = serviceObj.getLastRefTime();
                 
                 if (!eventDispatcher.isSubscribed(serviceName, clusters) && !futureMap
@@ -479,6 +489,7 @@ public class HostReactor implements Closeable {
                 incFailCount();
                 NAMING_LOGGER.warn("[NA] failed to update serviceName: " + serviceName, e);
             } finally {
+                // 开启下一次任务
                 executor.schedule(this, Math.min(delayTime << failCount, DEFAULT_DELAY * 60), TimeUnit.MILLISECONDS);
             }
         }
