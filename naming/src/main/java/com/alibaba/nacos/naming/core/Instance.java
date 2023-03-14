@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 
 /**
  * IP under service.
- *
+ * 就代表一个Nacos Client主机
  * @author nkorange
  */
 @JsonInclude(Include.NON_NULL)
@@ -52,6 +52,8 @@ public class Instance extends com.alibaba.nacos.api.naming.pojo.Instance impleme
     @JsonIgnore
     private volatile boolean mockValid = false;
     
+    // 对于持久实例，其值为true，则表示当前实例状态为”不健康”，即当前实例被“标记”
+    // 对于临时实例，其值永久为默认值false，即该属性对临时实例没有意义
     private volatile boolean marked = false;
     
     private String tenant;

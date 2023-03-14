@@ -51,30 +51,33 @@ public class WebUtils {
      */
     public static String required(final HttpServletRequest req, final String key) {
         String value = req.getParameter(key);
-        if (StringUtils.isEmpty(value)) {
+        if (StringUtils.isEmpty(value)) { // 若请求中不包含指定属性值，则抛出异常
             throw new IllegalArgumentException("Param '" + key + "' is required.");
         }
-        String encoding = req.getParameter("encoding");
+        String encoding = req.getParameter("encoding"); //解码
         return resolveValue(value, encoding);
     }
     
     /**
      * get target value from parameterMap, if not found will return default value.
-     *
+     * 
      * @param req          {@link HttpServletRequest}
      * @param key          key
      * @param defaultValue default value
      * @return value
      */
     public static String optional(final HttpServletRequest req, final String key, final String defaultValue) {
+        // 从parameterMap中获取目标值，如果没有找到将返回默认值。
         if (!req.getParameterMap().containsKey(key) || req.getParameterMap().get(key)[0] == null) {
             return defaultValue;
         }
+        // 从请求中获取到指定属性的值，若其值仅为“空白字符”，则直接返回给定的默认值
         String value = req.getParameter(key);
         if (StringUtils.isBlank(value)) {
             return defaultValue;
         }
         String encoding = req.getParameter("encoding");
+        // 使用指定的字符编码，对属性值进行解码
         return resolveValue(value, encoding);
     }
     

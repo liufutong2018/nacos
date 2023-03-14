@@ -37,7 +37,7 @@ public class Service {
     private String name;
     
     /**
-     * protect threshold.
+     * protect threshold. 保护阈值。
      */
     private float protectThreshold = 0.0F;
     

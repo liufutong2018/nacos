@@ -67,7 +67,7 @@ import java.util.Map;
 
 /**
  * Instance operation controller.
- *
+ * 该类为一个处理器，用于处理服务实例的 心跳、注册等 请求。
  * @author nkorange
  */
 @RestController
@@ -106,7 +106,7 @@ public class InstanceController {
     
     /**
      * Register new instance.
-     *
+     * 处理 nacos client 注册请求
      * @param request http request
      * @return 'ok' if success
      * @throws Exception any error during register
@@ -116,13 +116,16 @@ public class InstanceController {
     @Secured(parser = NamingResourceParser.class, action = ActionTypes.WRITE)
     public String register(HttpServletRequest request) throws Exception {
         
+        // 从请求中获取指定属性的值
         final String namespaceId = WebUtils
                 .optional(request, CommonParams.NAMESPACE_ID, Constants.DEFAULT_NAMESPACE_ID);
+        // 从请求中获取指定属性的值
         final String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
+        // 检测serviceName名称是否合法
         checkServiceNameFormat(serviceName);
-        
+        // 通过请求参数组装出instance❤
         final Instance instance = parseInstance(request);
-        
+        // 将instance写入到注册表❤
         serviceManager.registerInstance(namespaceId, serviceName, instance);
         return "ok";
     }
@@ -465,7 +468,9 @@ public class InstanceController {
         
         String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
         String app = WebUtils.optional(request, "app", "DEFAULT");
+        // 通过请求中的数据组装出一个instance
         Instance instance = getIpAddress(request);
+        // 初始化instance
         instance.setApp(app);
         instance.setServiceName(serviceName);
         // Generate simple instance id first. This value would be updated according to
@@ -476,13 +481,14 @@ public class InstanceController {
         if (StringUtils.isNotEmpty(metadata)) {
             instance.setMetadata(UtilsAndCommons.parseMetadata(metadata));
         }
-        
+        // 验证instance
         instance.validate();
         
         return instance;
     }
     
     private Instance getIpAddress(HttpServletRequest request) {
+        // 从请求中获取各种属性
         final String ip = WebUtils.required(request, "ip");
         final String port = WebUtils.required(request, "port");
         String cluster = WebUtils.optional(request, CommonParams.CLUSTER_NAME, StringUtils.EMPTY);
@@ -502,7 +508,7 @@ public class InstanceController {
         
         String weight = WebUtils.optional(request, "weight", "1");
         boolean healthy = BooleanUtils.toBoolean(WebUtils.optional(request, "healthy", "true"));
-        
+        // 使用获取到的属性值装配一个instance
         Instance instance = new Instance();
         instance.setPort(Integer.parseInt(port));
         instance.setIp(ip);

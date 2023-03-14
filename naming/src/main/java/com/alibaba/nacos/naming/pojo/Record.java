@@ -18,7 +18,8 @@ package com.alibaba.nacos.naming.pojo;
 
 /**
  * Record to transfer and store in Nacos cluster.
- *
+   RecordListener接口的泛型为指定了该监听器所要监听的实体类型。这个类型是一个Record接口的子接口。
+   Record是一个在Nacos集群中传输和存储的记录。
  * @author nkorange
  * @since 1.0.0
  */

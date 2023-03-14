@@ -18,14 +18,15 @@ package com.alibaba.nacos.naming.misc;
 
 /**
  * Synchronizer.
- *
+ * 同步器，是当前Nacos主动发起的同步操作。其包含两个方法，分别表示当前Nacos主动发送自己的Message给指定的Nacos；
+   主动从指定Nacos中获取指定key的Message。
  * @author nacos
  */
 public interface Synchronizer {
     
     /**
      * Send message to server.
-     *
+     * 将msg发送给指定的server
      * @param serverIP target server address
      * @param msg      message to send
      */

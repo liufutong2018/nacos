@@ -56,7 +56,7 @@ public class Instance {
     private double weight = 1.0D;
     
     /**
-     * instance health status.
+     * instance health status. 临时实例健康状态
      */
     private boolean healthy = true;
     

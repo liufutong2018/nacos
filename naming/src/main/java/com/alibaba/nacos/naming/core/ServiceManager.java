@@ -67,7 +67,8 @@ import org.springframework.util.CollectionUtils;
 
 /**
  * Core manager storing all services in Nacos.
- *
+ * Nacos中所有service的核心管理者。其中一个很重要的属性是serviceMap，就是Nacos中的服务注册表。
+   该接口中有很多的方法，这些方法可以完成在nacos集群中相关操作的同步。
  * @author nkorange
  */
 @Component
@@ -76,14 +77,19 @@ public class ServiceManager implements RecordListener<Service> {
     /**
      * Map(namespace, Map(group::serviceName, Service)).
      */
+    // Server端注册表，是一个双层map;
+    // 外层map的key为namespaceId，value为内层map
+    // 内层map的key为group::serviceName，value为Service
     private final Map<String, Map<String, Service>> serviceMap = new ConcurrentHashMap<>();
     
     private final LinkedBlockingDeque<ServiceKey> toBeUpdatedServicesQueue = new LinkedBlockingDeque<>(1024 * 1024);
     
+    // service状态同步器
     private final Synchronizer synchronizer = new ServiceStatusSynchronizer();
     
     private final Lock lock = new ReentrantLock();
     
+    // 一致性服务
     @Resource(name = "consistencyDelegate")
     private ConsistencyService consistencyService;
     
@@ -435,16 +441,18 @@ public class ServiceManager implements RecordListener<Service> {
     }
     
     public void addOrReplaceService(Service service) throws NacosException {
+        // 将这个service同步到其他nacos server
         consistencyService.put(KeyBuilder.buildServiceMetaKey(service.getNamespaceId(), service.getName()), service);
     }
     
     public void createEmptyService(String namespaceId, String serviceName, boolean local) throws NacosException {
+        // local为 true，表示临时实例
         createServiceIfAbsent(namespaceId, serviceName, local, null);
     }
     
     /**
      * Create service if not exist.
-     *
+     * 如果不存在，请创建服务。
      * @param namespaceId namespace
      * @param serviceName service name
      * @param local       whether create service by local
@@ -453,7 +461,9 @@ public class ServiceManager implements RecordListener<Service> {
      */
     public void createServiceIfAbsent(String namespaceId, String serviceName, boolean local, Cluster cluster)
             throws NacosException {
+        // 从注册表中获取service
         Service service = getService(namespaceId, serviceName);
+        // 若当前注册instance是其提供服务的第一个实例，则注册表中是没有该service的,此时会创建一个service实例
         if (service == null) {
             
             Loggers.SRV_LOG.info("creating empty service {}:{}", namespaceId, serviceName);
@@ -463,14 +473,17 @@ public class ServiceManager implements RecordListener<Service> {
             service.setGroupName(NamingUtils.getGroupName(serviceName));
             // now validate the service. if failed, exception will be thrown
             service.setLastModifiedMillis(System.currentTimeMillis());
+            // 重新计算校验和
             service.recalculateChecksum();
             if (cluster != null) {
+                // cluster和service发生关系
                 cluster.setService(service);
                 service.getClusterMap().put(cluster.getName(), cluster);
             }
             service.validate();
-            
+            // 将service写入到注册表
             putServiceAndInit(service);
+            // 对持久实例的操作
             if (!local) {
                 addOrReplaceService(service);
             }
@@ -478,8 +491,8 @@ public class ServiceManager implements RecordListener<Service> {
     }
     
     /**
-     * Register an instance to a service in AP mode.
-     *
+     * Register an instance to a service in AP mode. 通过AP模式向服务注册实例。
+     * 将instance写入到注册表
      * <p>This method creates service or cluster silently if they don't exist.
      *
      * @param namespaceId id of namespace
@@ -488,16 +501,16 @@ public class ServiceManager implements RecordListener<Service> {
      * @throws Exception any error occurred in the process
      */
     public void registerInstance(String namespaceId, String serviceName, Instance instance) throws NacosException {
-        
+        // 创建一个空service，不包含任何instance实例；注意，第三个参数true，表示临时实例
         createEmptyService(namespaceId, serviceName, instance.isEphemeral());
-        
+        // 从新注册表获取instance
         Service service = getService(namespaceId, serviceName);
         
         if (service == null) {
             throw new NacosException(NacosException.INVALID_PARAM,
                     "service not found, namespace: " + namespaceId + ", service: " + serviceName);
         }
-        
+        // 将instance写入到service，即写入到了注册表
         addInstance(namespaceId, serviceName, instance.isEphemeral(), instance);
     }
     
@@ -526,7 +539,7 @@ public class ServiceManager implements RecordListener<Service> {
     }
     
     /**
-     * Add instance to service.
+     * Add instance to service. 将instance写入到service，即写入到了注册表
      *
      * @param namespaceId namespace
      * @param serviceName service name
@@ -538,10 +551,11 @@ public class ServiceManager implements RecordListener<Service> {
             throws NacosException {
         
         String key = KeyBuilder.buildInstanceListKey(namespaceId, serviceName, ephemeral);
-        
+        // 从注册表中获取service
         Service service = getService(namespaceId, serviceName);
         
         synchronized (service) {
+            // 将要注册的instance写入到service，即写入到了注册表
             List<Instance> instanceList = addIpAddresses(service, ephemeral, ips);
             
             Instances instances = new Instances();
@@ -606,8 +620,8 @@ public class ServiceManager implements RecordListener<Service> {
     }
     
     /**
-     * Compare and get new instance list.
-     *
+     * Compare and get new instance list. 比较并获得新的实例列表。
+     * 修改当前service的instance列表，这个修改一共有两种操作:添加实例 与 删除实例
      * @param service   service
      * @param action    {@link UtilsAndCommons#UPDATE_INSTANCE_ACTION_REMOVE} or {@link UtilsAndCommons#UPDATE_INSTANCE_ACTION_ADD}
      * @param ephemeral whether instance is ephemeral
@@ -618,35 +632,44 @@ public class ServiceManager implements RecordListener<Service> {
     public List<Instance> updateIpAddresses(Service service, String action, boolean ephemeral, Instance... ips)
             throws NacosException {
         
+        // 从其它nacos获取当前服务数据（临时实例数据）
         Datum datum = consistencyService
                 .get(KeyBuilder.buildInstanceListKey(service.getNamespaceId(), service.getName(), ephemeral));
         
+        // 获取本地注册表中当前服务的所有临时实例
         List<Instance> currentIPs = service.allIPs(ephemeral);
         Map<String, Instance> currentInstances = new HashMap<>(currentIPs.size());
         Set<String> currentInstanceIds = Sets.newHashSet();
         
+        // 遍历注册表中获取到的实例
         for (Instance instance : currentIPs) {
+            // 将其放入到一个map key为ip:port，value为instance
             currentInstances.put(instance.toIpAddr(), instance);
+            // 将当前遍历的instanceId写入到一个set
             currentInstanceIds.add(instance.getInstanceId());
         }
         
         Map<String, Instance> instanceMap;
         if (datum != null) {
+            // 将注册表中主机的instance数据替换外来的相同主机的instance数据
             instanceMap = setValid(((Instances) datum.value).getInstanceList(), currentInstances);
         } else {
             instanceMap = new HashMap<>(ips.length);
         }
         
         for (Instance instance : ips) {
+            // 若当前service中不包含当前要注册的instance所属cLuster，则创建一个
             if (!service.getClusterMap().containsKey(instance.getClusterName())) {
                 Cluster cluster = new Cluster(instance.getClusterName(), service);
+                // 初始化cluster的健康检测任务
                 cluster.init();
                 service.getClusterMap().put(instance.getClusterName(), cluster);
                 Loggers.SRV_LOG
                         .warn("cluster: {} not found, ip: {}, will create new cluster with default configuration.",
                                 instance.getClusterName(), instance.toJson());
             }
-            
+            // 若当前操作为清除操作，则将当前instance从instanceMap中清除
+            // 否则就是添加操作，即将当前instance添加到instanceMap中
             if (UtilsAndCommons.UPDATE_INSTANCE_ACTION_REMOVE.equals(action)) {
                 instanceMap.remove(instance.getDatumKey());
             } else {
@@ -671,13 +694,16 @@ public class ServiceManager implements RecordListener<Service> {
     }
     
     private List<Instance> addIpAddresses(Service service, boolean ephemeral, Instance... ips) throws NacosException {
+        // 修改当前service的instance列表，这个修改一共有两种操作:添加实例 与 删除实例
         return updateIpAddresses(service, UtilsAndCommons.UPDATE_INSTANCE_ACTION_ADD, ephemeral, ips);
     }
     
     private Map<String, Instance> setValid(List<Instance> oldInstances, Map<String, Instance> map) {
         
         Map<String, Instance> instanceMap = new HashMap<>(oldInstances.size());
+        // 遍历外来的instance集合
         for (Instance instance : oldInstances) {
+            // 从注册表包含的instance中若可以找到当前遍历的instance, 则将注册表中该主机的instance 数据替换外来的数据
             Instance instance1 = map.get(instance.toIpAddr());
             if (instance1 != null) {
                 instance.setHealthy(instance1.isHealthy());
@@ -700,8 +726,8 @@ public class ServiceManager implements RecordListener<Service> {
     }
     
     /**
-     * Put service into manager.
-     *
+     * Put service into manager. 将服务放入管理器
+     * DCL ，双重检测锁
      * @param service service
      */
     public void putService(Service service) {
@@ -712,12 +738,17 @@ public class ServiceManager implements RecordListener<Service> {
                 }
             }
         }
+        // 写入到注册表map
         serviceMap.get(service.getNamespaceId()).put(service.getName(), service);
     }
-    
+
+    // 将service写入到注册表
     private void putServiceAndInit(Service service) throws NacosException {
+        // 将service写入注册表
         putService(service);
+        // 初始化service内部健康检测任务
         service.init();
+        // 给nacos集合中的当前服务的持实例、临时实例添加监听
         consistencyService
                 .listen(KeyBuilder.buildInstanceListKey(service.getNamespaceId(), service.getName(), true), service);
         consistencyService
