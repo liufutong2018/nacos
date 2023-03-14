@@ -124,14 +124,16 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
     }
     
     /**
-     * Process client beat.
+     * Process client beat. 处理客户端心跳。
      *
      * @param rsInfo metrics info of server
      */
     public void processClientBeat(final RsInfo rsInfo) {
+        // 创建一个处理器，其是一个任务
         ClientBeatProcessor clientBeatProcessor = new ClientBeatProcessor();
         clientBeatProcessor.setService(this);
         clientBeatProcessor.setRsInfo(rsInfo);
+        // 开启一个立即执行定时任务，执行ClientBeatProcessor任务的run()
         HealthCheckReactor.scheduleNow(clientBeatProcessor);
     }
     

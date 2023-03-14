@@ -63,7 +63,7 @@ public class ClientBeatProcessor implements Runnable {
     }
     
     @Override
-    public void run() {
+    public void run() { // 处理客户端心跳。
         Service service = this.service;
         if (Loggers.EVT_LOG.isDebugEnabled()) {
             Loggers.EVT_LOG.debug("[CLIENT-BEAT] processing beat: {}", rsInfo.toString());
@@ -73,21 +73,29 @@ public class ClientBeatProcessor implements Runnable {
         String clusterName = rsInfo.getCluster();
         int port = rsInfo.getPort();
         Cluster cluster = service.getClusterMap().get(clusterName);
+        // 获取当前服务的所有 临时实例
         List<Instance> instances = cluster.allIPs(true);
-        
+        // 遍历所有这些临时实例，从中查找当前发送心跳的instance
         for (Instance instance : instances) {
+            // 只要ip与port与当前心跳的instance的相同，就是了
             if (instance.getIp().equals(ip) && instance.getPort() == port) {
                 if (Loggers.EVT_LOG.isDebugEnabled()) {
                     Loggers.EVT_LOG.debug("[CLIENT-BEAT] refresh beat: {}", rsInfo.toString());
                 }
+                // 修改最后心跳时间
                 instance.setLastBeat(System.currentTimeMillis());
+                // 修改该instance的健康状态
+                // 当instance被标记时，即其marked为true时，其是一个持久实例
                 if (!instance.isMarked()) {
+                    // instance的healthy才是临时实例健康状态的表示
+                    // 若当前instance健康状态为false，但本次是其发送的心跳，说明这个instance“起死回生”了；我们需要将其health变为true
                     if (!instance.isHealthy()) {
                         instance.setHealthy(true);
                         Loggers.EVT_LOG
                                 .info("service: {} {POS} {IP-ENABLED} valid: {}:{}@{}, region: {}, msg: client beat ok",
                                         cluster.getService().getName(), ip, port, cluster.getName(),
                                         UtilsAndCommons.LOCALHOST_SITE);
+                        // 发布服务变更事件
                         getPushService().serviceChanged(service);
                     }
                 }

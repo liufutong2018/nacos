@@ -322,8 +322,9 @@ public class InstanceController {
     }
     
     /**
-     * Create a beat for instance.
-     *
+     * Create a beat for instance. 心跳
+     *该处理方式主要就是在注册表中查找这个instance，若没有找到，则创建一个再注册到注册表；若找到了，则更新其最后心跳时间戳。
+      其中比较重要的一项工作是，若这个instance的健康状态发生了变更，其会发布一个服务变更事件，以触发其它该服务的订阅者更新服务。
      * @param request http request
      * @return detail information of instance
      * @throws Exception any error during handle
@@ -332,18 +333,20 @@ public class InstanceController {
     @PutMapping("/beat")
     @Secured(parser = NamingResourceParser.class, action = ActionTypes.WRITE)
     public ObjectNode beat(HttpServletRequest request) throws Exception {
-        
+        // 创建一个JSON Node，该方法的返回值就是它，后面的代码就是对这个ode进行各种初始化
         ObjectNode result = JacksonUtils.createEmptyJsonNode();
         result.put(SwitchEntry.CLIENT_BEAT_INTERVAL, switchDomain.getClientBeatInterval());
-        
+        // 从请求中获取到beat，即cLient端的beatInfo
         String beat = WebUtils.optional(request, "beat", StringUtils.EMPTY);
         RsInfo clientBeat = null;
+        // beat构建为clientBeat
         if (StringUtils.isNotBlank(beat)) {
             clientBeat = JacksonUtils.toObj(beat, RsInfo.class);
         }
         String clusterName = WebUtils
                 .optional(request, CommonParams.CLUSTER_NAME, UtilsAndCommons.DEFAULT_CLUSTER_NAME);
         String ip = WebUtils.optional(request, "ip", StringUtils.EMPTY);
+        // 获取到客户端传递来的cLient的port，其将来用于UDP通信
         int port = Integer.parseInt(WebUtils.optional(request, "port", "0"));
         if (clientBeat != null) {
             if (StringUtils.isNotBlank(clientBeat.getCluster())) {
@@ -359,9 +362,13 @@ public class InstanceController {
         String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
         checkServiceNameFormat(serviceName);
         Loggers.SRV_LOG.debug("[CLIENT-BEAT] full arguments: beat: {}, serviceName: {}", clientBeat, serviceName);
+
+        // 从注册表中获取当前发送请求的cLient对应的instance
         Instance instance = serviceManager.getInstance(namespaceId, serviceName, clusterName, ip, port);
-        
+
+        // 处理注册表中不存在该cLentinstance的情况
         if (instance == null) {
+            // 若请求中没有携带心跳数据，则直接返回
             if (clientBeat == null) {
                 result.put(CommonParams.CODE, NamingResponseCode.RESOURCE_NOT_FOUND);
                 return result;
@@ -369,7 +376,9 @@ public class InstanceController {
             
             Loggers.SRV_LOG.warn("[CLIENT-BEAT] The instance has been removed for health mechanism, "
                     + "perform data compensation operations, beat: {}, serviceName: {}", clientBeat, serviceName);
-            
+            // 下面处理的情况是，注册表中没有该cLient的instance，但其发送的请求中具有心跳数据
+            // 在cLient的注册请求还未到达时(网络抖动等原因)，第一次心跳请求先到达了server，会出现这种情况
+            // 处理方式是，使用心跳数据构建出一个instance，注册到注册表
             instance = new Instance();
             instance.setPort(clientBeat.getPort());
             instance.setIp(clientBeat.getIp());
@@ -379,10 +388,10 @@ public class InstanceController {
             instance.setServiceName(serviceName);
             instance.setInstanceId(instance.getInstanceId());
             instance.setEphemeral(clientBeat.isEphemeral());
-            
+            // 新建，注册了一个
             serviceManager.registerInstance(namespaceId, serviceName, instance);
         }
-        
+        // 从注册表中获取service
         Service service = serviceManager.getService(namespaceId, serviceName);
         
         if (service == null) {
@@ -395,6 +404,8 @@ public class InstanceController {
             clientBeat.setPort(port);
             clientBeat.setCluster(clusterName);
         }
+
+        // 处理本次心跳
         service.processClientBeat(clientBeat);
         
         result.put(CommonParams.CODE, NamingResponseCode.OK);
