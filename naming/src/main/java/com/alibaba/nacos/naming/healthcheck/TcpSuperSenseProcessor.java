@@ -101,14 +101,17 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
     
     @Override
     public void process(HealthCheckTask task) {
+        // 获取当前cLuster 中包含的持久实例
         List<Instance> ips = task.getCluster().allIPs(false);
         
         if (CollectionUtils.isEmpty(ips)) {
             return;
         }
         
+        // 遍历所有持久实例
         for (Instance ip : ips) {
             
+            // 若当前instance过期，则跳过
             if (ip.isMarked()) {
                 if (SRV_LOG.isDebugEnabled()) {
                     SRV_LOG.debug("tcp check, ip is marked as to skip health check, ip:" + ip.getIp());
@@ -124,8 +127,9 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
                         .reEvaluateCheckRT(task.getCheckRtNormalized() * 2, task, switchDomain.getTcpHealthParams());
                 continue;
             }
-            
+            // 生成一个心跳实例
             Beat beat = new Beat(ip, task);
+            // 将心跳实例写入到taskQueue
             taskQueue.add(beat);
             MetricsMonitor.getTcpHealthCheckMonitor().incrementAndGet();
         }
