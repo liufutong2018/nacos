@@ -366,7 +366,7 @@ public class PushService implements ApplicationContextAware, ApplicationListener
     }
     
     /**
-     * Service changed.
+     * Service changed. 发布服务变更事件
      *
      * @param service service
      */
