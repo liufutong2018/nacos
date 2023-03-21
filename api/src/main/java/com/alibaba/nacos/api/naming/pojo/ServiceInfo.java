@@ -28,7 +28,7 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * ServiceInfo.
+ * ServiceInfo. 微服务信息实例。其包含着一个Instance列表。
  *
  * @author nkorange
  */

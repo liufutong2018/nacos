@@ -368,7 +368,7 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
     }
     
     /**
-     * Get all instance from input clusters.
+     * Get all instance from input clusters. 从输入集群中获取所有实例
      *
      * @param clusters cluster names
      * @return all instance from input clusters.
@@ -380,7 +380,8 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
             if (clusterObj == null) {
                 continue;
             }
-            
+            // 将当前遍历cLuster的所有instance添加到resuLt集合
+            // 包含所有持久实例与临时实例
             result.addAll(clusterObj.allIPs());
         }
         return result;
@@ -397,6 +398,7 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
             clusters = new ArrayList<>();
             clusters.addAll(clusterMap.keySet());
         }
+        // 获取到当前服务的所有cLuster 中的所有instance
         return allIPs(clusters);
     }
     

@@ -204,9 +204,10 @@ public class PushService implements ApplicationContextAware, ApplicationListener
      */
     public void addClient(String namespaceId, String serviceName, String clusters, String agent,
             InetSocketAddress socketAddr, DataSource dataSource, String tenant, String app) {
-        
+        // 创建一个UDP cLient
         PushClient client = new PushClient(namespaceId, serviceName, clusters, agent, socketAddr, dataSource, tenant,
                 app);
+        // 将这个UDP cLient添加到缓存map
         addClient(client);
     }
     
@@ -218,14 +219,21 @@ public class PushService implements ApplicationContextAware, ApplicationListener
     public void addClient(PushClient client) {
         // client is stored by key 'serviceName' because notify event is driven by serviceName change
         String serviceKey = UtilsAndCommons.assembleFullServiceName(client.getNamespaceId(), client.getServiceName());
+        // clientMap是一个缓存map，用于存放当前Nacos Server中所有instance对应的UDP CLient
+        // 其是一个双层map，外层map的key为 namespaceId##groupId@@微服务名称，value为内层map；内层map的key为instanceId，
+        // value为该instance对应的UDP CLient，即pushClient
         ConcurrentMap<String, PushClient> clients = clientMap.get(serviceKey);
+        // 若当前服务的内层map为nuLL，则创建一个并放入到缓存map
         if (clients == null) {
             clientMap.putIfAbsent(serviceKey, new ConcurrentHashMap<>(1024));
             clients = clientMap.get(serviceKey);
         }
-        
+        // 从内层map 中获取当前instance对应的的UDP cLient
         PushClient oldClient = clients.get(client.toString());
+        // 若该Pushclient不为nuLL，则更新一个最后引用时间戳;若该PushcLient为nuLL，
+        // 则将当前这个PushcLient作为PushcLient写入到内层map，即写入到了缓存map
         if (oldClient != null) {
+            // 更新最后引用时间戳
             oldClient.refresh();
         } else {
             PushClient res = clients.putIfAbsent(client.toString(), client);
