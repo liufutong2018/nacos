@@ -46,7 +46,8 @@ import java.util.Properties;
 
 /**
  * Nacos Naming Service.
- *
+ * 通过这个类的实例，可以完成Client与Server间的通信，例如注册/取消注册，订阅/取消订阅，获取Server状态，获取Server中指定的Instance。
+   注意，心跳不是通过这个类实例完成的。
  * @author nkorange
  */
 @SuppressWarnings("PMD.ServiceOrDaoClassShouldEndWithImplRule")
@@ -190,7 +191,10 @@ public class NacosNamingService implements NamingService {
         registerInstance(serviceName, Constants.DEFAULT_GROUP, instance);
     }
     
-    @Override //处理client注册
+    /**
+     * 处理Client注册
+     */
+    @Override 
     public void registerInstance(String serviceName, String groupName, Instance instance) throws NacosException {
         // 获得groupedServiceName 生成的String格式为 groupId@@微服务名称
         String groupedServiceName = NamingUtils.getGroupedName(serviceName, groupName);
@@ -200,7 +204,7 @@ public class NacosNamingService implements NamingService {
             // 2.向server发送心跳（定时任务），开了另一个线程去执行
             beatReactor.addBeatInfo(groupedServiceName, beatInfo);
         }
-        // 1.向server发送注册请求
+        // 1.向Server发送注册请求
         serverProxy.registerService(groupedServiceName, groupName, instance);
     }
     

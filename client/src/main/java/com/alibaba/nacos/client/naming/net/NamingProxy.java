@@ -212,7 +212,7 @@ public class NamingProxy implements Closeable {
     
     /**
      * register a instance to service with specified instance properties.
-     * 向server发送注册请求
+     * 向Server发送注册请求
      * @param serviceName name of service
      * @param groupName   group of service
      * @param instance    instance to register
@@ -495,7 +495,7 @@ public class NamingProxy implements Closeable {
     }
     
     /**
-     * Request api.
+     * Request api. 注册、心跳
      *
      * @param api     api
      * @param params  parameters
@@ -509,14 +509,14 @@ public class NamingProxy implements Closeable {
             String method) throws NacosException {
         
         params.put(CommonParams.NAMESPACE_ID, getNamespaceId());
-        
+        // servers：获取到客户端配置的nacosServer地址
         if (CollectionUtils.isEmpty(servers) && StringUtils.isEmpty(nacosDomain)) {
             throw new NacosException(NacosException.INVALID_PARAM, "no server available");
         }
         
         NacosException exception = new NacosException();
         
-        // 遍历所有server，从中随机的选择一个server去连接 
+        // 遍历所有server，从中随机的选择一个server去连接
         if (servers != null && !servers.isEmpty()) {
             // 生成一个随机数
             Random random = new Random(System.currentTimeMillis());
@@ -538,7 +538,7 @@ public class NamingProxy implements Closeable {
             }
         }
         
-        if (StringUtils.isNotBlank(nacosDomain)) {
+        if (StringUtils.isNotBlank(nacosDomain)) { //nacosDomain: 干啥用的？
             for (int i = 0; i < UtilAndComs.REQUEST_DOMAIN_RETRY_COUNT; i++) { //默认3次
                 try {
                     return callServer(api, params, body, nacosDomain, method);
@@ -573,7 +573,7 @@ public class NamingProxy implements Closeable {
     }
     
     /**
-     * Call server. 连接server；
+     * Call server. 连接Server；
      *
      * @param api       api
      * @param params    parameters
@@ -590,7 +590,7 @@ public class NamingProxy implements Closeable {
         injectSecurityInfo(params);
         Header header = builderHeader();
         
-        String url; // 构建请求URL
+        String url; // 构建请求的URL
         if (curServer.startsWith(UtilAndComs.HTTPS) || curServer.startsWith(UtilAndComs.HTTP)) {
             url = curServer + api;
         } else {
@@ -600,13 +600,12 @@ public class NamingProxy implements Closeable {
             url = NamingHttpClientManager.getInstance().getPrefix() + curServer + api;
         }
         
-        try { //提交请求
-            HttpRestResult<String> restResult = nacosRestTemplate
-                    .exchangeForm(url, header, Query.newInstance().initParams(params), body, method, String.class);
-            end = System.currentTimeMillis();
+        try { //提交请求 （注册或心跳）
+            HttpRestResult<String> restResult = nacosRestTemplate.exchangeForm(
+                url, header, Query.newInstance().initParams(params), body, method, String.class);
             
-            MetricsMonitor.getNamingRequestMonitor(method, url, String.valueOf(restResult.getCode()))
-                    .observe(end - start);
+            end = System.currentTimeMillis();
+            MetricsMonitor.getNamingRequestMonitor(method, url, String.valueOf(restResult.getCode())).observe(end - start);
             
             if (restResult.ok()) {
                 return restResult.getData();
