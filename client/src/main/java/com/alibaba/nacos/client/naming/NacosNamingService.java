@@ -325,7 +325,7 @@ public class NacosNamingService implements NamingService {
     @Override // Client获取要调用服务的提供者列表
     public List<Instance> selectInstances(String serviceName, String groupName, boolean healthy, boolean subscribe)
             throws NacosException {
-        // subscribe的值为true，表示本次查询是 订阅
+        // healthy的值为true， subscribe的值为true，表示本次查询是订阅
         return selectInstances(serviceName, groupName, new ArrayList<String>(), healthy, subscribe);
     }
     
@@ -352,14 +352,13 @@ public class NacosNamingService implements NamingService {
             boolean subscribe) throws NacosException {
         
         ServiceInfo serviceInfo;
-        // 是订阅，
+        // 是订阅 
         if (subscribe) {
             // 获取到要调用服务的serviceInfo
             serviceInfo = hostReactor.getServiceInfo(NamingUtils.getGroupedName(serviceName, groupName),
                     StringUtils.join(clusters, ","));
         } else {
-            serviceInfo = hostReactor
-                    .getServiceInfoDirectlyFromServer(NamingUtils.getGroupedName(serviceName, groupName),
+            serviceInfo = hostReactor.getServiceInfoDirectlyFromServer(NamingUtils.getGroupedName(serviceName, groupName),
                             StringUtils.join(clusters, ","));
         }
         // 从serviceInfo的所有instance实例中过滤出所有可用的
@@ -371,16 +370,16 @@ public class NacosNamingService implements NamingService {
         if (serviceInfo == null || CollectionUtils.isEmpty(list = serviceInfo.getHosts())) {
             return new ArrayList<Instance>();
         }
-        // 送代服务的所有instance实例
+        // 迭代服务的所有instance实例
         Iterator<Instance> iterator = list.iterator();
         while (iterator.hasNext()) {
             Instance instance = iterator.next();
-            // 若当前instance不是健康的，或不可用，或其权重小于等于，则从列表中将其删除
+            // 若当前instance不是健康的，或不可用，或其权重小于等于0，则从列表中将其删除
             if (healthy != instance.isHealthy() || !instance.isEnabled() || instance.getWeight() <= 0) {
                 iterator.remove();
             }
         }
-        
+        // 返回的列表包含的instance 都是可用的
         return list;
     }
     

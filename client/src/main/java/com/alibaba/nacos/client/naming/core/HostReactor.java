@@ -283,7 +283,7 @@ public class HostReactor implements Closeable {
         return null;
     }
 
-    // Client定时更新本地服务（获取指定名称的ServiceInfo）
+    // Client定时更新本地服务（获取指定名称的ServiceInfo） && Client获取要调用的服务提供者列表
     public ServiceInfo getServiceInfo(final String serviceName, final String clusters) {
         
         NAMING_LOGGER.debug("failover-mode: " + failoverReactor.isFailoverSwitch());
@@ -326,7 +326,7 @@ public class HostReactor implements Closeable {
         }
         // 启动一个定时任务，定时更新本地注册表中的serviceName的服务❤
         scheduleUpdateIfAbsent(serviceName, clusters);
-        
+        // 返回
         return serviceInfoMap.get(serviceObj.getKey());
     }
     
@@ -452,19 +452,20 @@ public class HostReactor implements Closeable {
                 // 从本地注册表中获取当前服务
                 ServiceInfo serviceObj = serviceInfoMap.get(ServiceInfo.getKey(serviceName, clusters));
                 
-                // 若本地地注册表中不存在该服务，则从server获取到后，更新到本地注册表
+                // 若本地地注册表中不存在该服务，则从Server获取到后，更新到本地注册表
                 if (serviceObj == null) {
-                    // 从server获取当前服务，并更新到本地注册表
+                    // 从Server获取当前服务，并更新到本地注册表
                     updateService(serviceName, clusters);
                     return;
                 }
                 /** 处理本地注册表中存在当前服务的情况
                     1.serviceObj.getLastRefTime() 获取到的是当前服务最后被访问的时间，这个时间是来自于本地注册表的，
-                      其记录的是所有提供这个服务的nstance中最后一个instance被访问的时间
+                      其记录的是所有提供这个服务的instance中最后一个instance被访问的时间
                     2.缓存LastRefTime 记录的是当前instance最后被访问的时间
                     若1。时间 小于 2。时间，说明当前注册表应该更新的
                 */
                 if (serviceObj.getLastRefTime() <= lastRefTime) {
+                    // 从Server获取当前服务，并更新到本地注册表
                     updateService(serviceName, clusters);
                     serviceObj = serviceInfoMap.get(ServiceInfo.getKey(serviceName, clusters));
                 } else {
@@ -473,7 +474,7 @@ public class HostReactor implements Closeable {
                     refreshOnly(serviceName, clusters);
                 }
                 
-                // 将来自于注册表的这个最后访问时间更新到当前client的缓存
+                // 将来自于注册表的这个最后访问时间更新到当前Client的缓存
                 lastRefTime = serviceObj.getLastRefTime();
                 
                 if (!eventDispatcher.isSubscribed(serviceName, clusters) && !futureMap
