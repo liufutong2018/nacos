@@ -139,14 +139,16 @@ public class Cluster extends com.alibaba.nacos.api.naming.pojo.Cluster implement
     }
     
     /**
-     * Init cluster.
+     * Init cluster. 开启Cluster的健康检测任务
      */
     public void init() {
         if (inited) {
             return;
         }
+        
         // 创建一个健康监测任务
         checkTask = new HealthCheckTask(this);
+
         // 开启定时任务
         HealthCheckReactor.scheduleCheck(checkTask);
         inited = true;

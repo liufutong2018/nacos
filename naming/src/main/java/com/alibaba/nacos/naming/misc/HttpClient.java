@@ -145,7 +145,7 @@ public class HttpClient {
     }
     
     /**
-     * Request http delete method by async.
+     * Request http delete method by async. 处理异步删除
      *
      * @param url         url
      * @param headers     headers
@@ -159,7 +159,7 @@ public class HttpClient {
     }
     
     /**
-     * Do http request by async.
+     * Do http request by async. 处理异步删除、获取、修改、新增
      *
      * @param url         request url
      * @param headers     request headers

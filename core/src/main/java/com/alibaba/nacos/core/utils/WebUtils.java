@@ -51,7 +51,7 @@ public class WebUtils {
      */
     public static String required(final HttpServletRequest req, final String key) {
         String value = req.getParameter(key);
-        if (StringUtils.isEmpty(value)) { // 若请求中不包含指定属性值，则抛出异常
+        if (StringUtils.isEmpty(value)) { // 若请求中不包含指定属性值，则抛出[异常]
             throw new IllegalArgumentException("Param '" + key + "' is required.");
         }
         String encoding = req.getParameter("encoding"); //解码

@@ -99,18 +99,15 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
         }
     }
     
-    @Override
+    @Override //开启Cluster的健康检测任务
     public void process(HealthCheckTask task) {
-        // 获取当前cluster 中包含的持久实例
+        // 获取当前cluster中包含的持久实例
         List<Instance> ips = task.getCluster().allIPs(false);
-        
         if (CollectionUtils.isEmpty(ips)) {
             return;
         }
-        
         // 遍历所有持久实例
         for (Instance ip : ips) {
-            
             // 若当前instance过期，则跳过
             if (ip.isMarked()) {
                 if (SRV_LOG.isDebugEnabled()) {
@@ -118,11 +115,9 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
                 }
                 continue;
             }
-            
             if (!ip.markChecking()) {
                 SRV_LOG.warn("tcp check started before last one finished, service: " + task.getCluster().getService()
                         .getName() + ":" + task.getCluster().getName() + ":" + ip.getIp() + ":" + ip.getPort());
-                
                 healthCheckCommon
                         .reEvaluateCheckRT(task.getCheckRtNormalized() * 2, task, switchDomain.getTcpHealthParams());
                 continue;
@@ -130,7 +125,7 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
             // 生成一个心跳实例
             Beat beat = new Beat(ip, task);
             // 将心跳实例写入到taskQueue
-            taskQueue.add(beat);
+            taskQueue.add(beat); //这个队列有专人处理
             MetricsMonitor.getTcpHealthCheckMonitor().incrementAndGet();
         }
     }

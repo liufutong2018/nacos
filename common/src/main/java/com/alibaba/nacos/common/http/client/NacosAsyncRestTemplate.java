@@ -100,7 +100,7 @@ public class NacosAsyncRestTemplate extends AbstractNacosRestTemplate {
      * @param query        http query param
      * @param responseType return type
      * @param callback     callback {@link Callback#onReceive(com.alibaba.nacos.common.model.RestResult)}
-     */
+     */ //处理异步删除
     public <T> void delete(String url, Header header, Query query, Type responseType, Callback<T> callback) {
         execute(url, HttpMethod.DELETE, new RequestHttpEntity(header, query), responseType, callback);
     }
@@ -351,7 +351,8 @@ public class NacosAsyncRestTemplate extends AbstractNacosRestTemplate {
                 new RequestHttpEntity(header.setContentType(MediaType.APPLICATION_FORM_URLENCODED), bodyValues),
                 responseType, callback);
     }
-    
+
+    //处理异步删除
     @SuppressWarnings("unchecked")
     private <T> void execute(String url, String httpMethod, RequestHttpEntity requestEntity, Type type,
             Callback<T> callback) {
@@ -361,7 +362,7 @@ public class NacosAsyncRestTemplate extends AbstractNacosRestTemplate {
                 logger.debug("HTTP method: {}, url: {}, body: {}", httpMethod, uri, requestEntity.getBody());
             }
             ResponseHandler<T> responseHandler = super.selectResponseHandler(type);
-            // 执行
+            // 执行异步删除
             clientRequest.execute(uri, httpMethod, requestEntity, responseHandler, callback);
         } catch (Exception e) {
             // When an exception occurs, use Callback to pass it instead of throw it directly.

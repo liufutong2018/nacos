@@ -44,12 +44,13 @@ public class DefaultAsyncHttpClientRequest implements AsyncHttpClientRequest {
             this.asyncClient.start();
         }
     }
-    
+
+    //可处理异步删除
     @Override
     public <T> void execute(URI uri, String httpMethod, RequestHttpEntity requestHttpEntity, final ResponseHandler<T> responseHandler,
             final Callback<T> callback) throws Exception {
         HttpRequestBase httpRequestBase = DefaultHttpClientRequest.build(uri, httpMethod, requestHttpEntity);
-        // 调用Apache的Http异步cLient 完成请求的提交
+        // 调用Apache的Http异步client 完成请求的提交
         asyncClient.execute(httpRequestBase, new FutureCallback<HttpResponse>() {
             // 请求获取到响应后会触发该回调方法的执行
             @Override

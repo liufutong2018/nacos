@@ -78,7 +78,7 @@ public class ClientBeatCheckTask implements Runnable {
             if (!getDistroMapper().responsible(service.getName())) {
                 return;
             }
-            // 苦当前服务没有开启检测功能，则直接结束
+            // 若当前服务没有开启检测功能，则直接结束
             if (!getSwitchDomain().isHealthCheckEnabled()) {
                 return;
             }
@@ -89,8 +89,8 @@ public class ClientBeatCheckTask implements Runnable {
             for (Instance instance : instances) {
                 // 若当前时间距离上次心跳时间已经超过了15s，则将当前instance状态设置为不健康
                 if (System.currentTimeMillis() - instance.getLastBeat() > instance.getInstanceHeartBeatTimeOut()) {
-                    // 若instance的marked属性不为true，则当前instance 可能是临时实例marked属性
-                    // 若为true，则instance 一定为持久实例
+                    // 若instance的marked属性不为true，则当前instance可能是临时实例
+                    // marked属性若为true，则instance一定为持久实例
                     if (!instance.isMarked()) {
                         if (instance.isHealthy()) {
                             // 将healthy状态设置为false
@@ -123,7 +123,7 @@ public class ClientBeatCheckTask implements Runnable {
                     // delete instance
                     Loggers.SRV_LOG.info("[AUTO-DELETE-IP] service: {}, ip: {}", service.getName(),
                             JacksonUtils.toJson(instance));
-                    // 清除
+                    // 清除 （处理删除请求的提交）
                     deleteIp(instance);
                 }
             }
@@ -134,6 +134,7 @@ public class ClientBeatCheckTask implements Runnable {
         
     }
     
+    // 处理删除请求的提交
     private void deleteIp(Instance instance) {
         
         try {
@@ -148,7 +149,7 @@ public class ClientBeatCheckTask implements Runnable {
                     + UtilsAndCommons.NACOS_NAMING_CONTEXT + "/instance?" + request.toUrl();
             
             // delete instance asynchronously:
-            // 异步删除；调用 Nacos 自研的HttpcLient完成Server间的请求提交，该HttpcLient是对Apache的Http异步CLient的封装
+            // 异步删除；调用Nacos自研的Httpclient完成Server间的请求提交，该Httpclient是对Apache的Http异步Client的封装
             HttpClient.asyncHttpDelete(url, null, null, new Callback<String>() {
                 @Override
                 public void onReceive(RestResult<String> result) {

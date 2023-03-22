@@ -106,7 +106,7 @@ public class InstanceController {
     
     /**
      * Register new instance.
-     * 处理 nacos client 注册请求
+     * 处理 Nacos Client 注册请求
      * @param request http request
      * @return 'ok' if success
      * @throws Exception any error during register
@@ -117,8 +117,7 @@ public class InstanceController {
     public String register(HttpServletRequest request) throws Exception {
         
         // 从请求中获取指定属性的值
-        final String namespaceId = WebUtils
-                .optional(request, CommonParams.NAMESPACE_ID, Constants.DEFAULT_NAMESPACE_ID);
+        final String namespaceId = WebUtils.optional(request, CommonParams.NAMESPACE_ID, Constants.DEFAULT_NAMESPACE_ID);
         // 从请求中获取指定属性的值
         final String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
         // 检测serviceName名称是否合法
@@ -131,7 +130,7 @@ public class InstanceController {
     }
     
     /**
-     * Deregister instances. 取消注册实例。
+     * Deregister instances. 取消注册实例。（处理异步删除、处理注销请求）
      *
      * @param request http request
      * @return 'ok' if success
@@ -240,8 +239,9 @@ public class InstanceController {
     }
     
     /**
-     * Get all instance of input service.
-     * 处理订阅请求
+     * Get all instance of input service. 处理订阅请求
+       创建了该NacosClient对应的UDP通信客户端PushClient，并将其写入到了一个缓存map
+       从注册表中获取到指定服务的所有可用的instance，并将其封装为JSON 
      * @param request http request
      * @return list of instance
      * @throws Exception any error during list
@@ -257,7 +257,7 @@ public class InstanceController {
         String agent = WebUtils.getUserAgent(request);
         String clusters = WebUtils.optional(request, "clusters", StringUtils.EMPTY);
         String clientIP = WebUtils.optional(request, "clientIP", StringUtils.EMPTY);
-        // 获取到cLient的端口号，后续UDP通信会使用
+        // 获取到client的端口号，后续UDP通信会使用
         int udpPort = Integer.parseInt(WebUtils.optional(request, "udpPort", "0"));
         String env = WebUtils.optional(request, "env", StringUtils.EMPTY);
         boolean isCheck = Boolean.parseBoolean(WebUtils.optional(request, "isCheck", "false"));
@@ -323,9 +323,9 @@ public class InstanceController {
     }
     
     /**
-     * Create a beat for instance. 心跳
-     *该处理方式主要就是在注册表中查找这个instance，若没有找到，则创建一个再注册到注册表；若找到了，则更新其最后心跳时间戳。
-      其中比较重要的一项工作是，若这个instance的健康状态发生了变更，其会发布一个服务变更事件，以触发其它该服务的订阅者更新服务。
+     * Create a beat for instance. Nacos处理心跳请求
+     * 该处理方式主要就是在注册表中查找这个instance，若没有找到，则创建一个再注册到注册表；若找到了，则更新其最后心跳时间戳。
+       其中比较重要的一项工作是，若这个instance的健康状态发生了变更，其会发布一个服务变更事件，以触发其它该服务的订阅者更新服务。
      * @param request http request
      * @return detail information of instance
      * @throws Exception any error during handle
@@ -334,10 +334,10 @@ public class InstanceController {
     @PutMapping("/beat")
     @Secured(parser = NamingResourceParser.class, action = ActionTypes.WRITE)
     public ObjectNode beat(HttpServletRequest request) throws Exception {
-        // 创建一个JSON Node，该方法的返回值就是它，后面的代码就是对这个ode进行各种初始化
+        // 创建一个JSONNode，该方法的返回值就是它，后面的代码就是对这个Node进行各种初始化
         ObjectNode result = JacksonUtils.createEmptyJsonNode();
         result.put(SwitchEntry.CLIENT_BEAT_INTERVAL, switchDomain.getClientBeatInterval());
-        // 从请求中获取到beat，即cLient端的beatInfo
+        // 从请求中获取到beat，即client端的beatInfo
         String beat = WebUtils.optional(request, "beat", StringUtils.EMPTY);
         RsInfo clientBeat = null;
         // beat构建为clientBeat
@@ -347,7 +347,7 @@ public class InstanceController {
         String clusterName = WebUtils
                 .optional(request, CommonParams.CLUSTER_NAME, UtilsAndCommons.DEFAULT_CLUSTER_NAME);
         String ip = WebUtils.optional(request, "ip", StringUtils.EMPTY);
-        // 获取到客户端传递来的cLient的port，其将来用于UDP通信
+        // 获取到客户端传递来的client的port，其将来用于UDP通信
         int port = Integer.parseInt(WebUtils.optional(request, "port", "0"));
         if (clientBeat != null) {
             if (StringUtils.isNotBlank(clientBeat.getCluster())) {
@@ -364,10 +364,10 @@ public class InstanceController {
         checkServiceNameFormat(serviceName);
         Loggers.SRV_LOG.debug("[CLIENT-BEAT] full arguments: beat: {}, serviceName: {}", clientBeat, serviceName);
 
-        // 从注册表中获取当前发送请求的cLient对应的instance
+        // 从注册表中获取当前发送请求的client对应的instance
         Instance instance = serviceManager.getInstance(namespaceId, serviceName, clusterName, ip, port);
 
-        // 处理注册表中不存在该cLentinstance的情况
+        // 处理注册表中不存在该client的instance的情况
         if (instance == null) {
             // 若请求中没有携带心跳数据，则直接返回
             if (clientBeat == null) {
@@ -377,8 +377,8 @@ public class InstanceController {
             
             Loggers.SRV_LOG.warn("[CLIENT-BEAT] The instance has been removed for health mechanism, "
                     + "perform data compensation operations, beat: {}, serviceName: {}", clientBeat, serviceName);
-            // 下面处理的情况是，注册表中没有该cLient的instance，但其发送的请求中具有心跳数据
-            // 在cLient的注册请求还未到达时(网络抖动等原因)，第一次心跳请求先到达了server，会出现这种情况
+            // 下面处理的情况是，注册表中没有该client的instance，但其发送的请求中具有心跳数据
+            // 在client的注册请求还未到达时(网络抖动等原因)，第一次心跳请求先到达了server，会出现这种情况
             // 处理方式是，使用心跳数据构建出一个instance，注册到注册表
             instance = new Instance();
             instance.setPort(clientBeat.getPort());
@@ -470,6 +470,7 @@ public class InstanceController {
      * @param combineServiceName such as: groupName@@serviceName
      */
     private void checkServiceNameFormat(String combineServiceName) {
+        // 必须以@@连接两个字符串
         String[] split = combineServiceName.split(Constants.SERVICE_INFO_SPLITER);
         if (split.length <= 1) {
             throw new IllegalArgumentException(

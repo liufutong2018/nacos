@@ -73,7 +73,7 @@ public class HealthCheckTask implements Runnable {
         checkRtWorst = 0L;
     }
     
-    @Override
+    @Override //开启Cluster的健康检测任务
     public void run() {
         
         try {

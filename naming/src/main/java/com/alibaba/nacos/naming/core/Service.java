@@ -52,16 +52,28 @@ import java.util.Map;
  * Service of Nacos server side
  * 在Nacos客户端的一个微服务名称定义的微服务，在Nacos服务端是以Service实例的形式出现的。
    其类似于ServiceInfo，只不过ServiceInfo是客户端服务，而core/Service是服务端服务。
-   Service类中有一个属性 protectThreshold ，保护阈值。
- * <p>We introduce a 'service --> cluster --> instance' model, in which service stores a list of clusters, which
- * contain SCI模型
+
+   com.alibaba.nacos.api.naming.pojo.Service类中有一个属性 protectThreshold，保护阈值。
+        与Eureka中的保护闽值对比:
+            1)相同点:都是一个0-1的数值，表示健康实例占所有实例的比例
+            2)保护方式不同:
+                Eureka: 一旦健康实例数量小于阈值，则不再从注册表中清除不健康的实例。
+                Nacos: 如果健康实例数量大于阈值，则消费者调用到的都是健康实例。
+                       一旦健康实例数量小于阈值，则消费者会从所有实例中进行选择调用，有可能会调用到不健康实例。
+                       这样可以保护健康的实例不会被压崩溃
+            3)范围不同:
+                Eureka: 这个阈值针对的是所有服务中的实例
+                Nacos: 这个阈值针对的是当前Service中的服务实例
+
+ * <p>We introduce a 'service --> cluster --> instance' model, in which service stores a list of clusters, which contain 
+    SCI模型
  * a list of instances.
  *
  * <p>his class inherits from Service in API module and stores some fields that do not have to expose to client.
  *
  * @author nkorange
  */
-@JsonInclude(Include.NON_NULL)
+@JsonInclude(Include.NON_NULL) //是监听者，也可以是被监听者 
 public class Service extends com.alibaba.nacos.api.naming.pojo.Service implements Record, RecordListener<Instances> {
     
     private static final String SERVICE_NAME_SYNTAX = "[0-9a-zA-Z@\\.:_-]+";
@@ -100,7 +112,7 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
      */
     private long pushCacheMillis = 0L;
     
-    // 重要集台key为clusterName，value为CLuster实例
+    // 重要集台key为clusterName，value为Cluster实例
     private Map<String, Cluster> clusterMap = new HashMap<>();
     
     public Service() {
@@ -129,10 +141,12 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
      * @param rsInfo metrics info of server
      */
     public void processClientBeat(final RsInfo rsInfo) {
+        
         // 创建一个处理器，其是一个任务
         ClientBeatProcessor clientBeatProcessor = new ClientBeatProcessor();
         clientBeatProcessor.setService(this);
         clientBeatProcessor.setRsInfo(rsInfo);
+
         // 开启一个立即执行定时任务，执行ClientBeatProcessor任务的run()
         HealthCheckReactor.scheduleNow(clientBeatProcessor);
     }
@@ -294,17 +308,19 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
     }
     
     /**
-     * Init service.  初始化service内部健康检测任务
+     * Init service.  初始化Service内部健康检测任务
      */
     public void init() {
-        // 开启定时清除过期instance任务
+
+        // 开启定时清除过期instance任务（清除临时实例）
         HealthCheckReactor.scheduleCheck(clientBeatCheckTask);
-        // 开启了当前service所包含的所有cLuster的健康检测任务
+
+        // 开启了当前service所包含的所有cluster的健康检测任务
         for (Map.Entry<String, Cluster> entry : clusterMap.entrySet()) {
             entry.getValue().setService(this);
-            // 开启当前遍历cLuster的健康检测任务：
+            // 开启当前遍历cluster的健康检测任务：
             //  将当前cluster包含的所有instance的心跳检测任务定时添加到一个任务队列taskQueue
-            // 即将当前cLuster所包含的 持久实例 的心跳任务添加到taskQueue
+            //  即将当前cluster所包含的[持久实例]的心跳任务添加到taskQueue
             entry.getValue().init();
         }
     }

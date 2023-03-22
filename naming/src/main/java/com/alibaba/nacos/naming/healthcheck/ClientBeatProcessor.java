@@ -73,7 +73,7 @@ public class ClientBeatProcessor implements Runnable {
         String clusterName = rsInfo.getCluster();
         int port = rsInfo.getPort();
         Cluster cluster = service.getClusterMap().get(clusterName);
-        // 获取当前服务的所有 临时实例
+        // 获取当前服务的所有临时实例
         List<Instance> instances = cluster.allIPs(true);
         // 遍历所有这些临时实例，从中查找当前发送心跳的instance
         for (Instance instance : instances) {
@@ -91,10 +91,8 @@ public class ClientBeatProcessor implements Runnable {
                     // 若当前instance健康状态为false，但本次是其发送的心跳，说明这个instance“起死回生”了；我们需要将其health变为true
                     if (!instance.isHealthy()) {
                         instance.setHealthy(true);
-                        Loggers.EVT_LOG
-                                .info("service: {} {POS} {IP-ENABLED} valid: {}:{}@{}, region: {}, msg: client beat ok",
-                                        cluster.getService().getName(), ip, port, cluster.getName(),
-                                        UtilsAndCommons.LOCALHOST_SITE);
+                        Loggers.EVT_LOG.info("service: {} {POS} {IP-ENABLED} valid: {}:{}@{}, region: {}, msg: client beat ok",
+                                    cluster.getService().getName(), ip, port, cluster.getName(), UtilsAndCommons.LOCALHOST_SITE);
                         // 发布服务变更事件(其对后续我们要分析的UDP通信非常重要)
                         getPushService().serviceChanged(service);
                     }
