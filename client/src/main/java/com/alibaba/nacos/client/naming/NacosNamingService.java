@@ -452,12 +452,11 @@ public class NacosNamingService implements NamingService {
         subscribe(serviceName, Constants.DEFAULT_GROUP, clusters, listener);
     }
     
-    @Override //client定时更新本地服务
+    @Override //Client定时更新本地服务
     public void subscribe(String serviceName, String groupName, List<String> clusters, EventListener listener)
             throws NacosException {
-        eventDispatcher.addListener(hostReactor
-                        .getServiceInfo(NamingUtils.getGroupedName(serviceName, groupName), StringUtils.join(clusters, ",")),
-                StringUtils.join(clusters, ","), listener);
+        eventDispatcher.addListener(hostReactor.getServiceInfo(NamingUtils.getGroupedName(serviceName, groupName), 
+                                            StringUtils.join(clusters, ",")), StringUtils.join(clusters, ","), listener);
     }
     
     @Override

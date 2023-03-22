@@ -451,7 +451,7 @@ public class NamingProxy implements Closeable {
         return getServiceList(pageNo, pageSize, groupName, null);
     }
     
-    // client获取所有服务
+    // Client获取所有服务
     public ListView<String> getServiceList(int pageNo, int pageSize, String groupName, AbstractSelector selector)
             throws NacosException {
         
@@ -473,14 +473,13 @@ public class NamingProxy implements Closeable {
                     break;
             }
         }
-        // 向server提交get请求，获取结果
+        // 向Server提交get请求，获取结果（Client获取所有服务）
         String result = reqApi(UtilAndComs.nacosUrlBase + "/service/list", params, HttpMethod.GET);
         
         JsonNode json = JacksonUtils.toObj(result);
         ListView<String> listView = new ListView<String>();
-        listView.setCount(json.get("count").asInt());//查出的数量
-        listView.setData(JacksonUtils.toObj(json.get("doms").toString(), new TypeReference<List<String>>() {
-        }));//查出的名称
+        listView.setCount(json.get("count").asInt()); //查出的服务数量
+        listView.setData(JacksonUtils.toObj(json.get("doms").toString(), new TypeReference<List<String>>() {})); //查出的名称
         
         return listView;
     }
@@ -495,7 +494,7 @@ public class NamingProxy implements Closeable {
     }
     
     /**
-     * Request api. 注册、心跳
+     * Request api. 注册、心跳、获取所有服务
      *
      * @param api     api
      * @param params  parameters
@@ -538,7 +537,7 @@ public class NamingProxy implements Closeable {
             }
         }
         
-        if (StringUtils.isNotBlank(nacosDomain)) { //nacosDomain: 干啥用的？
+        if (StringUtils.isNotBlank(nacosDomain)) { //nacosDomain：干啥用的？
             for (int i = 0; i < UtilAndComs.REQUEST_DOMAIN_RETRY_COUNT; i++) { //默认3次
                 try {
                     return callServer(api, params, body, nacosDomain, method);
@@ -600,7 +599,7 @@ public class NamingProxy implements Closeable {
             url = NamingHttpClientManager.getInstance().getPrefix() + curServer + api;
         }
         
-        try { //提交请求 （注册或心跳）
+        try { //提交请求 （注册或心跳或获取所有服务）
             HttpRestResult<String> restResult = nacosRestTemplate.exchangeForm(
                 url, header, Query.newInstance().initParams(params), body, method, String.class);
             

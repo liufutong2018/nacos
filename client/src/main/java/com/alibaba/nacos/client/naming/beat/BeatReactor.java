@@ -169,7 +169,7 @@ public class BeatReactor implements Closeable {
             try {
                 // 1.发送心跳，nacos自定义的
                 JsonNode result = serverProxy.sendBeat(beatInfo, BeatReactor.this.lightBeatEnabled);
-                long interval = result.get("clientBeatInterval").asLong(); //间隔
+                long interval = result.get("clientBeatInterval").asLong(); //心跳间隔
                 boolean lightBeatEnabled = false;
                 if (result.has(CommonParams.LIGHT_BEAT_ENABLED)) {
                     lightBeatEnabled = result.get(CommonParams.LIGHT_BEAT_ENABLED).asBoolean();
@@ -182,7 +182,7 @@ public class BeatReactor implements Closeable {
                 if (result.has(CommonParams.CODE)) {
                     code = result.get(CommonParams.CODE).asInt(); //从结果获取状态
                 }
-                // 若在server端没有该client，则返回20404；此时发起注册
+                // 若在Server端没有该Client，则返回20404；此时发起注册
                 if (code == NamingResponseCode.RESOURCE_NOT_FOUND) {
                     Instance instance = new Instance();
                     instance.setPort(beatInfo.getPort());
