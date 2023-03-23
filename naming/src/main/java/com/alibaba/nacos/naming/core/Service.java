@@ -414,7 +414,7 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
             clusters = new ArrayList<>();
             clusters.addAll(clusterMap.keySet());
         }
-        // 获取到当前服务的所有cLuster 中的所有instance
+        // 获取到当前服务的所有cluster 中的所有instance
         return allIPs(clusters);
     }
     

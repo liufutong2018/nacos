@@ -82,10 +82,12 @@ public class HostReactor implements Closeable {
             String cacheDir) {
         this(eventDispatcher, serverProxy, beatReactor, cacheDir, false, UtilAndComs.DEFAULT_POLLING_THREAD_COUNT);
     }
-    
+
+    // Nacos Client接收并处理Nacos Server的UDP推送
     public HostReactor(EventDispatcher eventDispatcher, NamingProxy serverProxy, BeatReactor beatReactor,
             String cacheDir, boolean loadCacheAtStart, int pollingThreadCount) {
         // init executorService
+        // 创建一个线程池
         this.executor = new ScheduledThreadPoolExecutor(pollingThreadCount, new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
@@ -107,6 +109,7 @@ public class HostReactor implements Closeable {
         
         this.updatingMap = new ConcurrentHashMap<String, Object>();
         this.failoverReactor = new FailoverReactor(this, cacheDir);
+        // 创建一个PushReceiver实例，用于UDP通信 
         this.pushReceiver = new PushReceiver(this);
     }
     

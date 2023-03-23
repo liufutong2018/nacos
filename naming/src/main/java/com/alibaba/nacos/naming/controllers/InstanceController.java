@@ -267,7 +267,7 @@ public class InstanceController {
         String tenant = WebUtils.optional(request, "tid", StringUtils.EMPTY);
         
         boolean healthyOnly = Boolean.parseBoolean(WebUtils.optional(request, "healthyOnly", "false"));
-        // 对请求进行详细处理
+        // 对请求进行详细处理❤
         return doSrvIpxt(namespaceId, serviceName, agent, clusters, clientIP, udpPort, env, isCheck, app, tenant,
                 healthyOnly);
     }
@@ -542,8 +542,9 @@ public class InstanceController {
     }
     
     /**
-     * Get service full information with instances.
-     *
+     * Get service full information with instances. 处理订阅请求
+     * 创建了该NacosClient对应的UDP通信客户端PushClient，并将其写入到了一个缓存map
+       从注册表中获取到指定服务的所有可用的instance，并将其封装为JSON
      * @param namespaceId namespace id
      * @param serviceName service name
      * @param agent       agent infor string
@@ -557,12 +558,12 @@ public class InstanceController {
      * @param healthyOnly whether only for healthy check
      * @return service full information with instances
      * @throws Exception any error during handle
-     */
+     */ //处理订阅请求
     public ObjectNode doSrvIpxt(String namespaceId, String serviceName, String agent, String clusters, String clientIP,
             int udpPort, String env, boolean isCheck, String app, String tid, boolean healthyOnly) throws Exception {
-        // 不同agent，生成不同的cLientInfo
+        // 不同agent，生成不同的clientInfo
         ClientInfo clientInfo = new ClientInfo(agent);
-        // 创建一个SON Node，其就是当前方法返回的结果。后续代码就是对这个Node的各种初始化
+        // 创建一个JSONNode，其就是当前方法返回的结果。后续代码就是对这个Node的各种初始化
         ObjectNode result = JacksonUtils.createEmptyJsonNode();
         // 从注册表中获取当前服务
         Service service = serviceManager.getService(namespaceId, serviceName);
@@ -571,10 +572,9 @@ public class InstanceController {
         // now try to enable the push
         try {
             if (udpPort > 0 && pushService.canEnablePush(agent)) {
-                // 创建当前发出订阅请求的nacos client的udp client
-                // 注意，在Nacos的UDP通信中，Nacos Server充当的是UDP cLient，Nacos cLient充当的是UDP Server
-                pushService
-                        .addClient(namespaceId, serviceName, clusters, agent, new InetSocketAddress(clientIP, udpPort),
+                // 创建当前发出订阅请求的NacosClient的UDPClient
+                // 注意，在Nacos的UDP通信中，NacosServer充当的是UDPClient，NacosClient充当的是UDPServer
+                pushService.addClient(namespaceId, serviceName, clusters, agent, new InetSocketAddress(clientIP, udpPort),
                                 pushDataSource, tid, app);
                 cacheMillis = switchDomain.getPushCacheMillis(serviceName);
             }
@@ -595,7 +595,7 @@ public class InstanceController {
             return result;
         }
         
-        // 代码直到这里，说明注册表中存在该服务，检测该服务是否被禁，若是被禁的服务，直接抛异常
+        // 代码走到这里，说明注册表中存在该服务，检测该服务是否被禁，若是被禁的服务，直接抛异常
         checkIfDisabled(service);
         
         List<Instance> srvedIPs;
@@ -611,18 +611,15 @@ public class InstanceController {
         
         // 若最终选择的结果为空，则直接结束
         if (CollectionUtils.isEmpty(srvedIPs)) {
-            
             if (Loggers.SRV_LOG.isDebugEnabled()) {
                 Loggers.SRV_LOG.debug("no instance to serve for service: {}", serviceName);
             }
-            
             if (clientInfo.type == ClientInfo.ClientType.JAVA
                     && clientInfo.version.compareTo(VersionUtil.parseVersion("1.0.0")) >= 0) {
                 result.put("dom", serviceName);
             } else {
                 result.put("dom", NamingUtils.getServiceName(serviceName));
             }
-            
             result.put("name", serviceName);
             result.put("cacheMillis", cacheMillis);
             result.put("lastRefTime", System.currentTimeMillis());
@@ -636,26 +633,25 @@ public class InstanceController {
         }
         // 代码走到这里，说明具有可用的instance
         Map<Boolean, List<Instance>> ipMap = new HashMap<>(2);
-        // 这个map只有两个key，True与False 
-        // key为true的value 中存放的是所有健康的instance；key为faLse的vaLue存放的是所有不健康的instance
+        // 这个map只有两个key，TRUE与FALSE 
+        //  key为TRUE的value中存放的是所有健康的instance；
+        //  key为FALSE的value存放的是所有不健康的instance
         ipMap.put(Boolean.TRUE, new ArrayList<>());
         ipMap.put(Boolean.FALSE, new ArrayList<>());
-        
         // 根据instance的健康状态，将所有instance分流放入map的不同key的value中
         for (Instance ip : srvedIPs) {
-            ipMap.get(ip.isHealthy()).add(ip);
+            ipMap.get(ip.isHealthy()).add(ip); //代码写的好
         }
         // 是否监测保护阈值
         if (isCheck) {
-            // reachProtectThreshold 是否达到了保护阙值
+            // reachProtectThreshold：是否达到了保护阙值
             result.put("reachProtectThreshold", false);
         }
-        
+        // 获取服务的保护阈值
         double threshold = service.getProtectThreshold();
 
         // 若“健康instance数量/instance总数” <= 保护阈值，则说明需要启动保护机制了 
         if ((float) ipMap.get(Boolean.TRUE).size() / srvedIPs.size() <= threshold) {
-            
             Loggers.SRV_LOG.warn("protect threshold reached, return all ips, service: {}", serviceName);
             if (isCheck) {
                 result.put("reachProtectThreshold", true);
@@ -663,38 +659,33 @@ public class InstanceController {
             // 将所有不健康的instance添加到的key为true的instance列表
             // 即key为true的value中(instance列表)存放的是所有instance实例包含所有健康的与不健康的instance
             ipMap.get(Boolean.TRUE).addAll(ipMap.get(Boolean.FALSE));
-            // 清空key为faLse的value (不健康的instance列表)
+            // 清空key为false的value (不健康的instance列表)
             ipMap.get(Boolean.FALSE).clear();
         }
         
         if (isCheck) {
             result.put("protectThreshold", service.getProtectThreshold());
             result.put("reachLocalSiteCallThreshold", false);
-            
             return JacksonUtils.createEmptyJsonNode();
         }
         
         ArrayNode hosts = JacksonUtils.createEmptyArrayNode();
         
-        // 注意，这个ipMap 中存放着所有健康与不健康的instance列表
+        // 注意，这个ipMap中存放着所有健康与不健康的instance列表
         for (Map.Entry<Boolean, List<Instance>> entry : ipMap.entrySet()) {
             List<Instance> ips = entry.getValue();
-
             // 若客户端只要健康的instance，且当前遍历的map的key为false，则跳过
             if (healthyOnly && !entry.getKey()) {
                 continue;
             }
-            
+            // 
             for (Instance instance : ips) {
-                
                 // remove disabled instance:
                 // 跳过禁用的instance
                 if (!instance.isEnabled()) {
                     continue;
                 }
-                
                 ObjectNode ipObj = JacksonUtils.createEmptyJsonNode();
-                
                 // 将当前遍历的instance转换为JSON
                 ipObj.put("ip", instance.getIp());
                 ipObj.put("port", instance.getPort());
@@ -713,10 +704,8 @@ public class InstanceController {
                 } else {
                     ipObj.put("serviceName", NamingUtils.getServiceName(instance.getServiceName()));
                 }
-                
                 ipObj.put("ephemeral", instance.isEphemeral());
                 hosts.add(ipObj);
-                
             }
         }
         
