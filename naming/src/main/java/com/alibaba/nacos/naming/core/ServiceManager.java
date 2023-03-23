@@ -125,16 +125,20 @@ public class ServiceManager implements RecordListener<Service> {
         this.raftPeerSet = raftPeerSet;
     }
     
-    /**
-     * Init service maneger.
+    /** 
+     * Init service maneger. Server间的操作
      */
     @PostConstruct
     public void init() {
+
+        // 启动了一个定时任务:每60s当前Server会向其它NacosServer发送一次本机注册表
+        // 本机注册表是以各个服务的checksum(字串拼接)形式被发送的
         GlobalExecutor.scheduleServiceReporter(new ServiceReporter(), 60000, TimeUnit.MILLISECONDS);
         
+        // 从其它NacosServer获取到注册表中的所有instance的最新状态并更新到本地注册表
         GlobalExecutor.submitServiceUpdateManager(new UpdatedServiceProcessor());
         
-        if (emptyServiceAutoClean) {
+        if (emptyServiceAutoClean) { //配置文件可配置此属性
             
             Loggers.SRV_LOG.info("open empty service auto clean job, initialDelay : {} ms, period : {} ms",
                     cleanEmptyServiceDelay, cleanEmptyServicePeriod);
@@ -145,6 +149,8 @@ public class ServiceManager implements RecordListener<Service> {
             // the possibility that the service cache information may just be deleted
             // and then created due to the heartbeat mechanism
             
+            // 启动了一个定时任务：每30s清理一次注册表中的空service
+            // 空service，即没有任何instance的service
             GlobalExecutor.scheduleServiceAutoClean(new EmptyServiceAutoClean(), cleanEmptyServiceDelay,
                     cleanEmptyServicePeriod);
         }
@@ -250,12 +256,15 @@ public class ServiceManager implements RecordListener<Service> {
         
         //get changed service from other server asynchronously
         @Override
-        public void run() {
+        public void run() { // 从其它NacosServer获取到注册表中的所有instance的最新状态并更新到本地注册表
             ServiceKey serviceKey = null;
             
             try {
+                // 运行一个无限循环
                 while (true) {
                     try {
+                        // 从队列中取出一个元素
+                        // toBeUpdatedServicesQueue中存放的是来自于其他Server的服务状态发生变更的服务
                         serviceKey = toBeUpdatedServicesQueue.take();
                     } catch (Exception e) {
                         Loggers.EVT_LOG.error("[UPDATE-DOMAIN] Exception while taking item from LinkedBlockingDeque.");
@@ -264,6 +273,7 @@ public class ServiceManager implements RecordListener<Service> {
                     if (serviceKey == null) {
                         continue;
                     }
+                    // 另启动一个线程，来完成ServiceUpdater任务
                     GlobalExecutor.submitServiceUpdate(new ServiceUpdater(serviceKey));
                 }
             } catch (Exception e) {
@@ -288,7 +298,7 @@ public class ServiceManager implements RecordListener<Service> {
         
         @Override
         public void run() {
-            try {
+            try { //更新健康状态
                 updatedHealthStatus(namespaceId, serviceName, serverIP);
             } catch (Exception e) {
                 Loggers.SRV_LOG
@@ -310,18 +320,23 @@ public class ServiceManager implements RecordListener<Service> {
      * @param serverIP    source server Ip
      */
     public void updatedHealthStatus(String namespaceId, String serviceName, String serverIP) {
+        // 从其它server获取指定服务的数据
         Message msg = synchronizer.get(serverIP, UtilsAndCommons.assembleFullServiceName(namespaceId, serviceName));
         JsonNode serviceJson = JacksonUtils.toObj(msg.getData());
         
         ArrayNode ipList = (ArrayNode) serviceJson.get("ips");
+        // 这个map中存放的是来自于其他nacos中的当前服务所包含的所有instance的健康状态
+        // map的key文ip:port，value为healthy
         Map<String, String> ipsMap = new HashMap<>(ipList.size());
+        // 遍历ipList
         for (int i = 0; i < ipList.size(); i++) {
-            
+            // 这个ip字符串的格式是：ip:port_healthy
             String ip = ipList.get(i).asText();
             String[] strings = ip.split("_");
+            // 将当前遍历instance的地址及健康状态写入到map
             ipsMap.put(strings[0], strings[1]);
         }
-        
+        // 从注册表中获取当前服务
         Service service = getService(namespaceId, serviceName);
         
         if (service == null) {
@@ -330,12 +345,16 @@ public class ServiceManager implements RecordListener<Service> {
         
         boolean changed = false;
         
+        // 获取到注册表中当前服务的所有instance
         List<Instance> instances = service.allIPs();
+        // 遍历注册表中当前服务的所有instance
         for (Instance instance : instances) {
-            
+            // 获取来自于其他nacos的当前遍历instance的健康状态
             boolean valid = Boolean.parseBoolean(ipsMap.get(instance.toIpAddr()));
+            // 若当前instance在注册表中记录的状态与外来的状态不一致，则以外来的为准
             if (valid != instance.isHealthy()) {
                 changed = true;
+                // 将注册表中的instance状态修改为外来的状态
                 instance.setHealthy(valid);
                 Loggers.EVT_LOG.info("{} {SYNC} IP-{} : {}:{}@{}", serviceName,
                         (instance.isHealthy() ? "ENABLED" : "DISABLED"), instance.getIp(), instance.getPort(),
@@ -343,7 +362,9 @@ public class ServiceManager implements RecordListener<Service> {
             }
         }
         
+        // 只要有一个instance的状态发生变更，那么这个changed就为true
         if (changed) {
+            // 发布状态变更事件
             pushService.serviceChanged(service);
             if (Loggers.EVT_LOG.isDebugEnabled()) {
                 StringBuilder stringBuilder = new StringBuilder();
@@ -366,7 +387,10 @@ public class ServiceManager implements RecordListener<Service> {
     public Map<String, Set<String>> getAllServiceNames() {
         
         Map<String, Set<String>> namesMap = new HashMap<>(16);
+        // 遍历注册表
         for (String namespaceId : serviceMap.keySet()) {
+            // serviceMap.get(namespaceId) 是注册表的内层map
+            // 其keySet即为所有服务名称(groupid@@微服务名称)
             namesMap.put(namespaceId, serviceMap.get(namespaceId).keySet());
         }
         return namesMap;
@@ -422,7 +446,7 @@ public class ServiceManager implements RecordListener<Service> {
     }
     
     /**
-     * Fast remove service.
+     * Fast remove service. 删除服务
      *
      * <p>Remove service bu async.
      *
@@ -436,7 +460,7 @@ public class ServiceManager implements RecordListener<Service> {
         if (service == null) {
             throw new IllegalArgumentException("specified service not exist, serviceName : " + serviceName);
         }
-        
+        // 通过同步服务实现服务的删除；就是会对nacos集合中所有server执行删除操作
         consistencyService.remove(KeyBuilder.buildServiceMetaKey(namespaceId, serviceName));
     }
     
@@ -878,6 +902,7 @@ public class ServiceManager implements RecordListener<Service> {
         
         public String namespaceId;
         
+        // key为服务名称(groupId@@微服务名称); value为该服务对应的checksum
         public Map<String, String> serviceName2Checksum = new HashMap<String, String>();
         
         public ServiceChecksum() {
@@ -907,40 +932,47 @@ public class ServiceManager implements RecordListener<Service> {
     private class EmptyServiceAutoClean implements Runnable {
         
         @Override
-        public void run() {
+        public void run() { //启动了一个定时任务：每30s清理一次注册表中的空service
             
             // Parallel flow opening threshold
-            
+            // 这是一个并行流开启阈值:当一个namespace中包含的service的数量超过100时，
+            // 会将注册创建为一个并行流，否则就是一个串行流
             int parallelSize = 100;
-            
+            // 遍历注册表
+            // stringServiceMap就是注册表的内层map
             serviceMap.forEach((namespace, stringServiceMap) -> {
                 Stream<Map.Entry<String, Service>> stream = null;
+                // 若当前遍历的元素(namespace)中包含的服务的数量超出了阈值，则生成一个并行流
                 if (stringServiceMap.size() > parallelSize) {
-                    stream = stringServiceMap.entrySet().parallelStream();
+                    stream = stringServiceMap.entrySet().parallelStream(); //并行流
                 } else {
-                    stream = stringServiceMap.entrySet().stream();
+                    stream = stringServiceMap.entrySet().stream(); //串行流
                 }
                 stream.filter(entry -> {
                     final String serviceName = entry.getKey();
+                    // 只要当前遍历的服务需要当前server负责，则通过过滤
                     return distroMapper.responsible(serviceName);
+                    // 这里的forEach遍历的元素一定是最终需要由当前server处理的服务
                 }).forEach(entry -> stringServiceMap.computeIfPresent(entry.getKey(), (serviceName, service) -> {
                     if (service.isEmpty()) {
                         
                         // To avoid violent Service removal, the number of times the Service
                         // experiences Empty is determined by finalizeCnt, and if the specified
                         // value is reached, it is removed
-                        
+
+                        // 若当前服务为空的次数超出了最大允许值，则删除这个服务
                         if (service.getFinalizeCount() > maxFinalizeCount) {
                             Loggers.SRV_LOG.warn("namespace : {}, [{}] services are automatically cleaned", namespace,
                                     serviceName);
                             try {
+                                // 删除服务
                                 easyRemoveService(namespace, serviceName);
                             } catch (Exception e) {
                                 Loggers.SRV_LOG.error("namespace : {}, [{}] services are automatically clean has "
                                         + "error : {}", namespace, serviceName, e);
                             }
                         }
-                        
+                        // 计数器加一 （就对没有超过最大值的起作用）
                         service.setFinalizeCount(service.getFinalizeCount() + 1);
                         
                         Loggers.SRV_LOG
@@ -948,6 +980,7 @@ public class ServiceManager implements RecordListener<Service> {
                                                 + "an empty instance is : {}", namespace, serviceName,
                                         service.getFinalizeCount());
                     } else {
+                        // 将计数器归零
                         service.setFinalizeCount(0);
                     }
                     return service;
@@ -959,56 +992,64 @@ public class ServiceManager implements RecordListener<Service> {
     private class ServiceReporter implements Runnable {
         
         @Override
-        public void run() {
+        public void run() { // 启动了一个定时任务:每60s当前Server会向其它NacosServer发送一次本机注册表
             try {
                 
+                // map的key为namespaceId，value为一个Set集合，集合中存放的是当前namespace中所有service的名称
+                // 这个map 中存放的是当前注册表中所有服务的名称
                 Map<String, Set<String>> allServiceNames = getAllServiceNames();
                 
                 if (allServiceNames.size() <= 0) {
                     //ignore
                     return;
                 }
-                
+                // 遍历所有的namespace
                 for (String namespaceId : allServiceNames.keySet()) {
-                    
+                     
                     ServiceChecksum checksum = new ServiceChecksum(namespaceId);
                     
+                    // 遍历当前namespace中的所有服务名称
                     for (String serviceName : allServiceNames.get(namespaceId)) {
+                        // 若当前服务不归当前Server负责，则直接跳过
                         if (!distroMapper.responsible(serviceName)) {
                             continue;
                         }
-                        
+                        // 从注册表中获取到当前遍历的服务
                         Service service = getService(namespaceId, serviceName);
                         
                         if (service == null || service.isEmpty()) {
                             continue;
                         }
-                        
+                        // 重新计算当前service的Checksum
                         service.recalculateChecksum();
-                        
+                        // 将计算好的checksum写入到map
                         checksum.addItem(serviceName, service.getChecksum());
                     }
                     
                     Message msg = new Message();
-                    
+                    // 将当前namespace中的所有服务的checksum写入到msg中，将来将msg发送给其他nacos
                     msg.setData(JacksonUtils.toJson(checksum));
                     
+                    // 获取到所有nacos
                     Collection<Member> sameSiteServers = memberManager.allMembers();
                     
                     if (sameSiteServers == null || sameSiteServers.size() <= 0) {
                         return;
                     }
-                    
+                    // 遍历所有nacos，要将msg发送出去
                     for (Member server : sameSiteServers) {
+                        // 若当前遍历的server是当前server，则直接跳过
                         if (server.getAddress().equals(NetUtils.localServer())) {
                             continue;
                         }
+                        // 将msg发送给当前遍历的server
                         synchronizer.send(server.getAddress(), msg);
                     }
                 }
             } catch (Exception e) {
                 Loggers.SRV_LOG.error("[DOMAIN-STATUS] Exception while sending service status", e);
             } finally {
+                // 开启下一次定时执行
                 GlobalExecutor.scheduleServiceReporter(this, switchDomain.getServiceStatusSynchronizationPeriodMillis(),
                         TimeUnit.MILLISECONDS);
             }
